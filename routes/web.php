@@ -48,6 +48,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/cobros/{cobro}/anular', [CobroController::class, 'anular'])->name('cobros.anular');
 
     Route::resource('habitaciones', HabitacionController::class)->except('show')->parameters(['habitaciones' => 'habitacion']);
+    Route::post('/habitaciones/{habitacion}/limpiar', [HabitacionController::class, 'limpiar'])->name('habitaciones.limpiar');
 
     Route::resource('tipos-habitacion', TipoHabitacionController::class)->except('show')->parameters(['tipos-habitacion' => 'tipo_habitacion']);
 

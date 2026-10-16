@@ -72,7 +72,7 @@
                     <label for="metodo" class="label">Método *</label>
                     <select id="metodo" name="metodo" class="select" required>
                         @foreach (\App\Models\Cobro::METODOS as $metodo)
-                            <option value="{{ $metodo }}" {{ old('metodo', 'efectivo') === $metodo ? 'selected' : '' }}>{{ ucfirst($metodo) }}</option>
+                            <option value="{{ $metodo }}" {{ old('metodo', 'efectivo') === $metodo ? 'selected' : '' }}>{{ \App\Models\Cobro::etiqueta($metodo) }}</option>
                         @endforeach
                     </select>
                     @error('metodo') <div class="error-text">{{ $message }}</div> @enderror
@@ -134,7 +134,7 @@
                                 @endif
                             </div>
                         </td>
-                        <td>{{ ucfirst($cobro->metodo) }}</td>
+                        <td>{{ \App\Models\Cobro::etiqueta($cobro->metodo) }}</td>
                         <td class="font-bold {{ $cobro->monto < 0 ? 'text-rose-600' : 'text-slate-900' }}">{{ bs($cobro->monto) }}</td>
                         <td>{{ $cobro->usuario->name ?? '—' }}</td>
                         <td>

@@ -24,26 +24,28 @@ class ReservaSeeder extends Seeder
         $recepcionista = User::where('role', User::ROLE_RECEPCIONISTA)->first()
             ?? User::query()->firstOrFail();
 
-        // [numero habitación, documento huésped, entrada, salida, n° huéspedes, estado, cobro]
-        // cobro: null = sin cobro, número = monto abonado, 'total' = pago completo.
+        // [numero habitación, documento huésped, entrada, salida, n° huéspedes, estado, pago]
+        // pago: null = sin cobro, 'anticipo' = anticipo mínimo (config hotel.anticipo_porcentaje),
+        // 'total' = pago completo de la estadía. Las reservas 'hospedado'/'finalizada'
+        // deben estar totalmente pagadas porque el check-in exige saldo cero.
         $ejemplos = [
             ['101', '10234567', -10, -7, 1, 'finalizada', 'total'],
-            ['101', '20345678', -5, 2, 1, 'hospedado', 200],
-            ['102', '40567890', 0, 3, 1, 'confirmada', 150],
-            ['103', '50678901', 5, 8, 1, 'pendiente', null],
+            ['101', '20345678', -5, 2, 1, 'hospedado', 'total'],
+            ['102', '40567890', 0, 3, 1, 'confirmada', 'anticipo'],
+            ['103', '50678901', 5, 8, 1, 'pendiente', 'anticipo'],
             ['104', '60789012', -20, -18, 1, 'cancelada', null],
             ['201', '10234567', -8, -5, 2, 'finalizada', 'total'],
-            ['201', '30456789', 3, 6, 2, 'confirmada', 250],
-            ['202', '20345678', -3, 1, 2, 'hospedado', 300],
-            ['203', '40567890', 10, 14, 2, 'confirmada', null],
-            ['204', '50678901', -1, 2, 2, 'hospedado', null],
-            ['301', '20345678', 1, 4, 3, 'confirmada', null],
+            ['201', '30456789', 3, 6, 2, 'confirmada', 'total'],
+            ['202', '20345678', -3, 1, 2, 'hospedado', 'total'],
+            ['203', '40567890', 10, 14, 2, 'confirmada', 'anticipo'],
+            ['204', '50678901', -1, 2, 2, 'hospedado', 'total'],
+            ['301', '20345678', 1, 4, 3, 'confirmada', 'anticipo'],
             ['302', '40567890', -4, -1, 3, 'finalizada', 'total'],
             ['401', '60789012', -15, -12, 4, 'finalizada', 'total'],
-            ['402', '10234567', 7, 11, 3, 'confirmada', 350],
+            ['402', '10234567', 7, 11, 3, 'confirmada', 'anticipo'],
             ['501', '30456789', -6, -2, 2, 'finalizada', 'total'],
-            ['501', '20345678', 20, 23, 2, 'pendiente', null],
-            ['502', '40567890', -2, 3, 3, 'hospedado', 1000],
+            ['501', '20345678', 20, 23, 2, 'pendiente', 'anticipo'],
+            ['502', '40567890', -2, 3, 3, 'hospedado', 'total'],
         ];
 
         foreach ($ejemplos as [$numero, $documento, $entrada, $salida, $personas, $estado, $pago]) {
@@ -80,18 +82,18 @@ class ReservaSeeder extends Seeder
                 $habitacion->update(['estado' => 'ocupada']);
             }
 
-            if ($pago === null) {
+            if ($pago === null || $reserva->cobros()->exists()) {
                 continue;
             }
 
-            $monto = $pago === 'total' ? $total : (float) $pago;
+            $monto = $pago === 'total' ? $total : anticipo_minimo($total);
 
             Cobro::create([
                 'reserva_id' => $reserva->id,
                 'user_id' => $recepcionista->id,
                 'monto' => $monto,
-                'metodo' => ['efectivo', 'tarjeta', 'transferencia'][$reserva->id % 3],
-                'concepto' => $pago === 'total' ? 'Pago total de la estadía' : 'Anticipo de estadía',
+                'metodo' => ['efectivo', 'qr', 'transferencia'][$reserva->id % 3],
+                'concepto' => $pago === 'total' ? 'Pago total de la estadía' : 'Anticipo de reserva',
                 'tipo' => Cobro::TIPO_PAGO,
                 'fecha' => $fechaEntrada->toDateString(),
                 'clave_idempotencia' => (string) Str::uuid(),

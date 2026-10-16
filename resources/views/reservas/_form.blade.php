@@ -72,6 +72,38 @@
 
 <div id="estimacion" class="hidden mt-5 rounded-xl border border-marca-200 bg-marca-50 px-4 py-3 text-sm font-semibold text-marca-800"></div>
 
+@unless ($esEdicion)
+    <div class="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
+        <h3 class="text-sm font-bold text-slate-800">Anticipo para asegurar la reserva</h3>
+        <p class="mt-1 text-xs text-slate-600">
+            Se exige un mínimo del {{ (float) config('hotel.anticipo_porcentaje') }}% del total.
+            Sin este pago la reserva no queda garantizada.
+        </p>
+        <div class="form-grid mt-4">
+            <div>
+                <label for="anticipo_monto" class="label">Anticipo (Bs) *</label>
+                <input type="number" step="0.01" min="0.01" id="anticipo_monto" name="anticipo_monto" class="input" value="{{ old('anticipo_monto') }}" required>
+                @error('anticipo_monto') <div class="error-text">{{ $message }}</div> @enderror
+                <div class="hint" id="anticipo-minimo-hint"></div>
+            </div>
+            <div>
+                <label for="anticipo_metodo" class="label">Método de pago del anticipo *</label>
+                <select id="anticipo_metodo" name="anticipo_metodo" class="select" required>
+                    @foreach (\App\Models\Cobro::METODOS as $metodo)
+                        <option value="{{ $metodo }}" {{ old('anticipo_metodo', 'efectivo') === $metodo ? 'selected' : '' }}>{{ \App\Models\Cobro::etiqueta($metodo) }}</option>
+                    @endforeach
+                </select>
+                @error('anticipo_metodo') <div class="error-text">{{ $message }}</div> @enderror
+            </div>
+            <div>
+                <label for="anticipo_fecha" class="label">Fecha del anticipo *</label>
+                <input type="date" id="anticipo_fecha" name="anticipo_fecha" class="input" value="{{ old('anticipo_fecha', now()->format('Y-m-d')) }}" required>
+                @error('anticipo_fecha') <div class="error-text">{{ $message }}</div> @enderror
+            </div>
+        </div>
+    </div>
+@endunless
+
 <div class="mt-6 flex items-center gap-3">
     <button type="submit" class="btn btn-primary">{{ $esEdicion ? 'Actualizar reserva' : 'Crear reserva' }}</button>
     <a href="{{ route('reservas.index') }}" class="btn btn-secondary">Cancelar</a>
@@ -82,6 +114,9 @@
     const salida = document.getElementById('fecha_salida');
     const habitacion = document.getElementById('habitacion_id');
     const estimacion = document.getElementById('estimacion');
+    const anticipoMinimoHint = document.getElementById('anticipo-minimo-hint');
+    const anticipoMonto = document.getElementById('anticipo_monto');
+    const porcentajeAnticipo = {{ (float) config('hotel.anticipo_porcentaje') }};
 
     function calcular() {
         const precio = parseFloat(habitacion.selectedOptions[0]?.dataset.precio || 0);
@@ -91,10 +126,22 @@
 
         if (precio > 0 && noches > 0) {
             const fmt = v => new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2 }).format(v);
+            const total = noches * precio;
+            const minimo = total * porcentajeAnticipo / 100;
+
             estimacion.classList.remove('hidden');
-            estimacion.textContent = noches + ' noche(s) × Bs ' + fmt(precio) + ' = Total estimado: Bs ' + fmt(noches * precio);
+            estimacion.textContent = noches + ' noche(s) × Bs ' + fmt(precio) + ' = Total estimado: Bs ' + fmt(total);
+
+            if (anticipoMinimoHint && anticipoMonto) {
+                anticipoMinimoHint.textContent = 'Mínimo para asegurar: Bs ' + fmt(minimo);
+                anticipoMonto.min = minimo.toFixed(2);
+            }
         } else {
             estimacion.classList.add('hidden');
+
+            if (anticipoMinimoHint) {
+                anticipoMinimoHint.textContent = '';
+            }
         }
     }
 

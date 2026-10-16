@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Cobro;
 use App\Models\Habitacion;
 use App\Models\Huesped;
 use App\Models\Reserva;
 use App\Models\TipoHabitacion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ReportesYCatalogoTest extends TestCase
@@ -88,6 +90,41 @@ class ReportesYCatalogoTest extends TestCase
             ->assertSee('Tasa de cancelación')
             ->assertSee('Top habitaciones por ingresos')
             ->assertSee('Detalle diario');
+    }
+
+    public function test_reporte_muestra_detalle_qr_y_transferencia(): void
+    {
+        $reserva = $this->reserva();
+
+        Cobro::create([
+            'reserva_id' => $reserva->id,
+            'user_id' => $this->admin->id,
+            'monto' => 100,
+            'metodo' => 'qr',
+            'concepto' => 'Estadía',
+            'tipo' => Cobro::TIPO_PAGO,
+            'fecha' => now()->toDateString(),
+            'clave_idempotencia' => (string) Str::uuid(),
+        ]);
+
+        Cobro::create([
+            'reserva_id' => $reserva->id,
+            'user_id' => $this->admin->id,
+            'monto' => 150,
+            'metodo' => 'transferencia',
+            'concepto' => 'Estadía',
+            'tipo' => Cobro::TIPO_PAGO,
+            'fecha' => now()->toDateString(),
+            'clave_idempotencia' => (string) Str::uuid(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/reportes')
+            ->assertStatus(200)
+            ->assertSee('Registros por QR y transferencia bancaria')
+            ->assertSee('Total QR')
+            ->assertSee('Total transferencia bancaria')
+            ->assertSee('Transferencia bancaria');
     }
 
     public function test_admin_descarga_reporte_pdf(): void

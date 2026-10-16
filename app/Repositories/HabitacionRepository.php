@@ -79,7 +79,7 @@ class HabitacionRepository
     ): Collection {
         return Habitacion::query()
             ->with('tipoHabitacion')
-            ->where('estado', '!=', 'mantenimiento')
+            ->whereNotIn('estado', Habitacion::ESTADOS_NO_DISPONIBLES)
             ->when($tipoId, fn (Builder $q) => $q->where('tipo_habitacion_id', $tipoId))
             ->when($capacidadMin, fn (Builder $q) => $q->whereHas(
                 'tipoHabitacion',

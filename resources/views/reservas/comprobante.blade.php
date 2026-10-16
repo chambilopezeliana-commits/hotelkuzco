@@ -77,7 +77,7 @@
                             <tr>
                                 <td>{{ $cobro->fecha->format('d/m/Y') }}</td>
                                 <td>{{ $cobro->concepto }}@if ($cobro->esContraasiento()) <span class="badge badge-purple ml-1">Contraasiento</span>@endif</td>
-                                <td>{{ ucfirst($cobro->metodo) }}</td>
+                                <td>{{ \App\Models\Cobro::etiqueta($cobro->metodo) }}</td>
                                 <td class="text-right font-semibold {{ $cobro->monto < 0 ? 'text-rose-600' : '' }}">{{ bs($cobro->monto) }}</td>
                             </tr>
                         @endforeach

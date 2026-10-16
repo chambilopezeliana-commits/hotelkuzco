@@ -8,11 +8,53 @@
     <p class="page-sub">Resumen operativo del hotel en tiempo real</p>
 </div>
 
+@if (($datos['limpieza'] ?? 0) > 0)
+<div class="alert alert-warning mb-6">
+    <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+    <div class="flex-1">
+        <div class="font-semibold">Alerta de limpieza · {{ $datos['limpieza'] }} habitación(es) pendiente(s)</div>
+        <div class="mt-1 text-xs text-amber-700">Estas habitaciones quedaron libres tras el check-out y aún no pueden ocuparse.</div>
+        <div class="mt-3 flex flex-wrap gap-2">
+            @foreach ($datos['habitacionesLimpieza'] as $h)
+            <form method="POST" action="{{ route('habitaciones.limpiar', $h) }}">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-success">Nº {{ $h->numero }} · Marcar limpia</button>
+            </form>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
+
+@if (($datos['reservasSinAnticipo'] ?? collect())->isNotEmpty())
+<div class="alert alert-error mb-6">
+    <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+    <div class="flex-1">
+        <div class="font-semibold">Reservas sin anticipo suficiente · {{ $datos['reservasSinAnticipo']->count() }}</div>
+        <div class="mt-1 text-xs text-rose-700">
+            Reservas pendientes o confirmadas cuyo anticipo no alcanza el mínimo del
+            {{ (float) config('hotel.anticipo_porcentaje') }}% del total. Riesgo de pérdida: contacte al huésped o registre el pago.
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+            @foreach ($datos['reservasSinAnticipo'] as $r)
+            <div class="flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-1 text-xs">
+                <span class="font-semibold text-slate-800">Nº {{ $r->habitacion->numero ?? '—' }}</span>
+                <span class="text-slate-500">{{ $r->huesped->nombre ?? '—' }}</span>
+                <span class="text-slate-400">{{ $r->fecha_entrada->format('d/m/Y') }}</span>
+                <span class="font-semibold text-rose-600">Falta {{ bs((float) $r->total - (float) ($r->cobros_sum_monto ?? 0)) }}</span>
+                <a href="{{ route('cobros.index', $r) }}" class="font-medium text-marca-600 hover:underline">Cobrar</a>
+            </div>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="kpi-grid mb-8">
     <div class="stat-card">
         <span class="stat-label">Habitaciones libres</span>
         <span class="stat-value">{{ $datos['disponibles'] }}<span class="text-slate-300 text-lg font-semibold">/{{ $datos['totalHabitaciones'] }}</span></span>
-        <span class="stat-hint">{{ $datos['mantenimiento'] }} en mantenimiento</span>
+        <span class="stat-hint">{{ $datos['mantenimiento'] }} en mantenimiento@if (($datos['limpieza'] ?? 0) > 0) · {{ $datos['limpieza'] }} en limpieza@endif</span>
     </div>
     <div class="stat-card">
         <span class="stat-label">Ocupadas</span>

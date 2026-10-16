@@ -45,14 +45,12 @@
                         <th>Precio / noche</th>
                         <th>Estado</th>
                         <th>Descripción</th>
-                        @if (auth()->user()->esAdmin())
-                            <th class="text-right">Acciones</th>
-                        @endif
+                        <th class="text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @php
-                        $estadoBadge = ['disponible' => 'badge-success', 'ocupada' => 'badge-danger', 'mantenimiento' => 'badge-warning'];
+                        $estadoBadge = ['disponible' => 'badge-success', 'ocupada' => 'badge-danger', 'mantenimiento' => 'badge-warning', 'limpieza' => 'badge-limpieza'];
                     @endphp
                     @foreach ($habitaciones as $habitacion)
                     <tr>
@@ -62,18 +60,24 @@
                         <td class="font-semibold">{{ bs($habitacion->precio) }}</td>
                         <td><span class="badge {{ $estadoBadge[$habitacion->estado] ?? 'badge-neutral' }}">{{ ucfirst($habitacion->estado) }}</span></td>
                         <td class="text-slate-500">{{ \Illuminate\Support\Str::limit($habitacion->descripcion, 40) }}</td>
-                        @if (auth()->user()->esAdmin())
                         <td>
                             <div class="acciones justify-end">
+                                @if ($habitacion->requiereLimpieza())
+                                <form method="POST" action="{{ route('habitaciones.limpiar', $habitacion) }}">
+                                    @csrf
+                                    <button class="btn btn-sm btn-success" type="submit">Marcar limpia</button>
+                                </form>
+                                @endif
+                                @if (auth()->user()->esAdmin())
                                 <a href="{{ route('habitaciones.edit', $habitacion) }}" class="btn btn-sm btn-secondary">Editar</a>
                                 <form method="POST" action="{{ route('habitaciones.destroy', $habitacion) }}" onsubmit="return confirm('¿Eliminar la habitación {{ $habitacion->numero }}?')">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-danger" type="submit">Eliminar</button>
                                 </form>
+                                @endif
                             </div>
                         </td>
-                        @endif
                     </tr>
                     @endforeach
                 </tbody>

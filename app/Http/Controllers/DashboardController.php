@@ -23,6 +23,11 @@ class DashboardController extends Controller
             'disponibles' => Habitacion::where('estado', 'disponible')->count(),
             'ocupadas' => Habitacion::where('estado', 'ocupada')->count(),
             'mantenimiento' => Habitacion::where('estado', 'mantenimiento')->count(),
+            'limpieza' => Habitacion::where('estado', 'limpieza')->count(),
+            'habitacionesLimpieza' => Habitacion::with('tipoHabitacion')
+                ->where('estado', 'limpieza')
+                ->orderBy('numero')
+                ->get(),
             'reservasHoy' => Reserva::whereDate('fecha_entrada', $hoy)
                 ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
                 ->count(),
@@ -36,6 +41,13 @@ class DashboardController extends Controller
                 ->whereYear('fecha', $hoy->year)
                 ->sum('monto'),
             'cobrosHoy' => (float) Cobro::whereDate('fecha', $hoy)->sum('monto'),
+            'reservasSinAnticipo' => Reserva::with(['huesped', 'habitacion'])
+                ->whereIn('estado', ['pendiente', 'confirmada'])
+                ->withSum('cobros', 'monto')
+                ->orderBy('fecha_entrada')
+                ->get()
+                ->filter(fn (Reserva $reserva) => (float) ($reserva->cobros_sum_monto ?? 0) < anticipo_minimo((float) $reserva->total) - 0.009)
+                ->values(),
         ];
 
         if (request()->user()->esAdmin()) {

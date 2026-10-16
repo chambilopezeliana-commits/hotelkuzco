@@ -9,6 +9,7 @@ use App\Models\TipoHabitacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
@@ -74,7 +75,7 @@ class ReporteController extends Controller
             ? round($nochesVendidas / ($totalHabitaciones * $nochesPeriodo) * 100, 2)
             : 0.0;
 
-        $cobros = Cobro::whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()]);
+        $cobros = Cobro::whereBetween('fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()]);
 
         $ingresosNetos = (float) (clone $cobros)->sum('monto');
         $pagosBrutos = (float) (clone $cobros)->where('monto', '>', 0)->sum('monto');
@@ -88,6 +89,7 @@ class ReporteController extends Controller
 
         $porTipo = $this->porTipoHabitacion($desde, $hasta);
         $porMetodo = $this->porMetodoPago($desde, $hasta);
+        $qrTransferencia = $this->detalleQrTransferencia($desde, $hasta);
         $reservasPeriodo = Reserva::whereBetween('created_at', [$desde, $hasta])
             ->get(['id', 'estado', 'fecha_entrada', 'fecha_salida']);
         $reservasPorEstado = $reservasPeriodo
@@ -118,6 +120,8 @@ class ReporteController extends Controller
             'revpar' => $revpar,
             'porTipo' => $porTipo,
             'porMetodo' => $porMetodo,
+            'detalleQrTransferencia' => $qrTransferencia['detalle'],
+            'totalesQrTransferencia' => $qrTransferencia['totales'],
             'reservasPorEstado' => $reservasPorEstado,
             'totalReservasPeriodo' => $totalReservasPeriodo,
             'canceladas' => $canceladas,
@@ -174,7 +178,7 @@ class ReporteController extends Controller
                 $noches += max(0, (int) $desdeSolape->diffInDays($hastaSolape));
             }
 
-            $ingresos = (float) Cobro::whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            $ingresos = (float) Cobro::whereBetween('fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
                 ->whereIn('reserva_id', $reservas->pluck('id'))
                 ->sum('monto');
 
@@ -190,15 +194,54 @@ class ReporteController extends Controller
 
     private function porMetodoPago(Carbon $desde, Carbon $hasta)
     {
-        return Cobro::whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+        return Cobro::whereBetween('fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
             ->selectRaw('metodo, SUM(monto) as total, COUNT(*) as cantidad')
             ->groupBy('metodo')
             ->get()
             ->map(fn ($fila) => [
-                'metodo' => ucfirst($fila->metodo),
+                'metodo' => Cobro::etiqueta($fila->metodo),
                 'total' => (float) $fila->total,
                 'cantidad' => (int) $fila->cantidad,
             ]);
+    }
+
+    /**
+     * Detalle de cobros realizados por QR y transferencia bancaria, con sus totales.
+     *
+     * @return array{detalle: Collection, totales: Collection}
+     */
+    private function detalleQrTransferencia(Carbon $desde, Carbon $hasta): array
+    {
+        $metodos = ['qr', 'transferencia'];
+
+        $cobros = Cobro::with(['reserva.huesped', 'reserva.habitacion', 'usuario'])
+            ->whereBetween('fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
+            ->whereIn('metodo', $metodos)
+            ->orderBy('fecha')
+            ->orderBy('id')
+            ->get();
+
+        $detalle = $cobros->map(fn (Cobro $cobro) => [
+            'fecha' => $cobro->fecha,
+            'metodo' => $cobro->metodo,
+            'metodo_label' => Cobro::etiqueta($cobro->metodo),
+            'monto' => (float) $cobro->monto,
+            'reserva_id' => $cobro->reserva_id,
+            'huesped' => $cobro->reserva->huesped->nombre ?? '—',
+            'documento' => $cobro->reserva->huesped->documento ?? '',
+            'habitacion' => $cobro->reserva->habitacion->numero ?? '—',
+            'registrado_por' => $cobro->usuario->name ?? '—',
+            'anulado' => (bool) $cobro->anulado,
+        ]);
+
+        $totales = collect($metodos)->map(fn (string $metodo) => [
+            'metodo' => $metodo,
+            'metodo_label' => Cobro::etiqueta($metodo),
+            'cantidad' => $cobros->where('metodo', $metodo)->count(),
+            'total' => round((float) $cobros->where('metodo', $metodo)->sum('monto'), 2),
+        ]);
+
+        return ['detalle' => $detalle, 'totales' => $totales];
     }
 
     /**
@@ -213,7 +256,7 @@ class ReporteController extends Controller
             ->whereDate('fecha_salida', '>=', $desde->toDateString())
             ->get(['fecha_entrada', 'fecha_salida']);
 
-        $ingresosPorDia = Cobro::whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+        $ingresosPorDia = Cobro::whereBetween('fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
             ->get(['fecha', 'monto'])
             ->groupBy(fn (Cobro $cobro) => $cobro->fecha->toDateString())
             ->map(fn ($grupo) => (float) $grupo->sum('monto'));
@@ -253,7 +296,7 @@ class ReporteController extends Controller
             ->join('reservas', 'reservas.id', '=', 'cobros.reserva_id')
             ->join('habitaciones', 'habitaciones.id', '=', 'reservas.habitacion_id')
             ->whereNotNull('cobros.reserva_id')
-            ->whereBetween('cobros.fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->whereBetween('cobros.fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
             ->selectRaw('habitaciones.numero as numero, SUM(cobros.monto) as ingresos, COUNT(*) as pagos')
             ->groupBy('habitaciones.numero')
             ->orderByDesc('ingresos')

@@ -158,4 +158,23 @@ class CorreccionesTest extends TestCase
             ->get('/reportes?desde=no-es-fecha')
             ->assertRedirect();
     }
+
+    public function test_panel_muestra_alerta_de_limpieza(): void
+    {
+        Habitacion::create([
+            'numero' => '777',
+            'tipo_habitacion_id' => TipoHabitacion::create([
+                'nombre' => 'Temporal',
+                'tarifa' => 10,
+                'capacidad' => 1,
+                'activo' => true,
+            ])->id,
+            'estado' => 'limpieza',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/panel')
+            ->assertOk()
+            ->assertSee('Alerta de limpieza');
+    }
 }

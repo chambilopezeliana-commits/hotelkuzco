@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Auditoria;
+use App\Models\Cobro;
 use App\Models\Habitacion;
 use App\Models\Reserva;
+use App\Models\User;
 use App\Repositories\HabitacionRepository;
 use App\Repositories\ReservaRepository;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +16,7 @@ class ReservaService
     public function __construct(
         private readonly ReservaRepository $reservas,
         private readonly HabitacionRepository $habitaciones,
+        private readonly CobroService $cobros,
     ) {}
 
     public function listar(?string $estado = null, ?string $buscar = null, ?string $desde = null, ?string $hasta = null)
@@ -26,6 +29,14 @@ class ReservaService
         return $this->reservas->encontrar($id);
     }
 
+    /**
+     * Anticipo mínimo para garantizar una reserva (porcentaje configurable).
+     */
+    public function anticipoMinimo(float $total): float
+    {
+        return anticipo_minimo($total);
+    }
+
     public function crear(array $datos): Reserva
     {
         $this->validarFechas($datos['fecha_entrada'], $datos['fecha_salida']);
@@ -33,11 +44,7 @@ class ReservaService
         $reserva = DB::transaction(function () use ($datos) {
             $habitacion = $this->habitaciones->bloquear($datos['habitacion_id']);
 
-            if ($habitacion->estado === 'mantenimiento') {
-                throw new OperacionInvalida(
-                    'No es posible: la habitación '.$habitacion->numero.' está en mantenimiento.'
-                );
-            }
+            $this->validarHabitacionOperativa($habitacion);
 
             $this->validarCapacidad($habitacion, (int) $datos['num_huespedes']);
             $this->validarSinSolape($habitacion, $datos['fecha_entrada'], $datos['fecha_salida']);
@@ -53,17 +60,29 @@ class ReservaService
     }
 
     /**
-     * Registro directo (walk-in): crea la reserva con entrada en el día y
-     * realiza el check-in inmediatamente (HU14).
+     * Registro directo (walk-in): crea la reserva con entrada en el día,
+     * registra el pago total de la estadía y realiza el check-in (HU14).
      */
-    public function walkIn(array $datos): Reserva
+    public function walkIn(array $datos, User $usuario): Reserva
     {
         $datos['fecha_entrada'] = now()->toDateString();
         $datos['estado'] = 'confirmada';
+        $metodo = $datos['metodo_pago'] ?? 'efectivo';
+        unset($datos['metodo_pago']);
 
-        $reserva = $this->crear($datos);
+        return DB::transaction(function () use ($datos, $usuario, $metodo) {
+            $reserva = $this->crear($datos);
 
-        return $this->checkIn($reserva);
+            $this->cobros->registrar($reserva, [
+                'monto' => (float) $reserva->total,
+                'metodo' => $metodo,
+                'concepto' => 'Estadía (check-in directo)',
+                'fecha' => now()->toDateString(),
+                'tipo' => Cobro::TIPO_PAGO,
+            ], $usuario);
+
+            return $this->checkIn($reserva);
+        });
     }
 
     public function actualizar(Reserva $reserva, array $datos): Reserva
@@ -153,14 +172,19 @@ class ReservaService
             throw new OperacionInvalida('La fecha de entrada aún no llegó.');
         }
 
+        $saldo = $this->cobros->saldoPendiente($reserva);
+
+        if ($saldo > 0.009) {
+            throw new OperacionInvalida(
+                'No se puede hacer check-in: la estadía tiene un saldo pendiente de '.bs($saldo)
+                .'. Registre el pago total antes de entregar la habitación.'
+            );
+        }
+
         $reserva = DB::transaction(function () use ($reserva) {
             $habitacion = $this->habitaciones->bloquear($reserva->habitacion_id);
 
-            if ($habitacion->estado === 'mantenimiento') {
-                throw new OperacionInvalida(
-                    'No es posible: la habitación '.$habitacion->numero.' está en mantenimiento.'
-                );
-            }
+            $this->validarHabitacionOperativa($habitacion);
 
             $ocupadaPor = $habitacion->reservas()
                 ->where('id', '!=', $reserva->id)
@@ -185,28 +209,37 @@ class ReservaService
         return $reserva;
     }
 
-    public function checkOut(Reserva $reserva, float $saldoPendiente): Reserva
+    public function checkOut(Reserva $reserva): Reserva
     {
         if ($reserva->estado !== 'hospedado') {
             throw new OperacionInvalida('El check-out solo aplica a huéspedes hospedados.');
         }
 
-        if ($saldoPendiente > 0.009) {
-            throw new OperacionInvalida(
-                'No se puede finalizar: saldo pendiente de '.bs($saldoPendiente)
-            );
-        }
-
         $reserva = DB::transaction(function () use ($reserva) {
             $habitacion = $this->habitaciones->bloquear($reserva->habitacion_id);
-            $habitacion->update(['estado' => 'disponible']);
+            $habitacion->update(['estado' => 'limpieza']);
 
             return $this->reservas->guardar($reserva, ['estado' => 'finalizada']);
         });
 
-        Auditoria::registrar('check-out', 'reserva', $reserva->id, 'Check-out de la reserva #'.$reserva->id, [], ['estado' => 'finalizada']);
+        Auditoria::registrar('check-out', 'reserva', $reserva->id, 'Check-out de la reserva #'.$reserva->id.'; habitación '.$reserva->habitacion->numero.' enviada a limpieza', [], ['estado' => 'finalizada']);
 
         return $reserva;
+    }
+
+    private function validarHabitacionOperativa(Habitacion $habitacion): void
+    {
+        if ($habitacion->estado === 'mantenimiento') {
+            throw new OperacionInvalida(
+                'No es posible: la habitación '.$habitacion->numero.' está en mantenimiento.'
+            );
+        }
+
+        if ($habitacion->estado === 'limpieza') {
+            throw new OperacionInvalida(
+                'No es posible: la habitación '.$habitacion->numero.' está pendiente de limpieza.'
+            );
+        }
     }
 
     private function validarCapacidad(Habitacion $habitacion, int $numHuespedes): void

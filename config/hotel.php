@@ -29,4 +29,6 @@ return [
     'instagram' => env('HOTEL_INSTAGRAM', 'https://www.instagram.com/hotelkuzco'),
 
     'tiktok' => env('HOTEL_TIKTOK', 'https://www.tiktok.com/@hotelkuzco'),
+
+    'anticipo_porcentaje' => (float) env('HOTEL_ANTICIPO_PORCENTAJE', 30),
 ];

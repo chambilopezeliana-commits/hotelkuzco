@@ -89,13 +89,13 @@
                         <td>
                             <div class="acciones justify-end">
                                 @if (in_array($reserva->estado, ['pendiente', 'confirmada']))
-                                    <form method="POST" action="{{ route('reservas.checkin', $reserva) }}">
+                                    <form method="POST" action="{{ route('reservas.checkin', $reserva) }}" onsubmit="return confirm('¿Realizar check-in? Se requiere el pago total de la estadía.')">
                                         @csrf
                                         <button class="btn btn-sm btn-success" type="submit">Check-in</button>
                                     </form>
                                 @endif
                                 @if ($reserva->estado === 'hospedado')
-                                    <form method="POST" action="{{ route('reservas.checkout', $reserva) }}" onsubmit="return confirm('¿Realizar check-out? La estadía debe estar saldada.')">
+                                    <form method="POST" action="{{ route('reservas.checkout', $reserva) }}" onsubmit="return confirm('¿Realizar check-out? La habitación pasará a limpieza.')">
                                         @csrf
                                         <button class="btn btn-sm btn-success" type="submit">Check-out</button>
                                     </form>

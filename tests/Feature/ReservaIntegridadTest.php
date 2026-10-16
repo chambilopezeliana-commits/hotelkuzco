@@ -44,6 +44,9 @@ class ReservaIntegridadTest extends TestCase
 
     private function datosReserva(string $entrada, string $salida, array $extra = []): array
     {
+        $noches = max(1, (int) round((strtotime($salida) - strtotime($entrada)) / 86400));
+        $total = 50 * $noches;
+
         return array_merge([
             'habitacion_id' => $this->habitacion->id,
             'huesped_id' => $this->huesped->id,
@@ -51,6 +54,9 @@ class ReservaIntegridadTest extends TestCase
             'fecha_salida' => $salida,
             'num_huespedes' => 1,
             'estado' => 'confirmada',
+            'anticipo_monto' => round($total * 0.3, 2),
+            'anticipo_metodo' => 'efectivo',
+            'anticipo_fecha' => now()->toDateString(),
         ], $extra);
     }
 
@@ -107,6 +113,28 @@ class ReservaIntegridadTest extends TestCase
         $this->assertEquals(0, Reserva::count());
     }
 
+    public function test_no_se_puede_reservar_habitacion_pendiente_de_limpieza(): void
+    {
+        $this->habitacion->update(['estado' => 'limpieza']);
+
+        $this->actingAs($this->usuario)
+            ->post('/reservas', $this->datosReserva('2027-02-01', '2027-02-03'))
+            ->assertSessionHas('error', fn ($mensaje) => str_contains($mensaje, 'limpieza'));
+
+        $this->assertEquals(0, Reserva::count());
+    }
+
+    public function test_marcar_limpia_deja_la_habitacion_disponible(): void
+    {
+        $this->habitacion->update(['estado' => 'limpieza']);
+
+        $this->actingAs($this->usuario)
+            ->post("/habitaciones/{$this->habitacion->id}/limpiar")
+            ->assertRedirect();
+
+        $this->assertEquals('disponible', $this->habitacion->fresh()->estado);
+    }
+
     public function test_cancelar_reserva_libera_las_fechas(): void
     {
         $this->actingAs($this->usuario)
@@ -125,28 +153,33 @@ class ReservaIntegridadTest extends TestCase
         $this->assertEquals(2, Reserva::count());
     }
 
-    public function test_check_in_y_check_out_con_cobro_total(): void
+    public function test_anticipo_minimo_se_exige_al_crear(): void
+    {
+        $this->actingAs($this->usuario)
+            ->post('/reservas', $this->datosReserva('2027-01-01', '2027-01-04', ['anticipo_monto' => 10]))
+            ->assertSessionHas('error', fn ($mensaje) => str_contains($mensaje, 'anticipo mínimo'));
+
+        $this->assertEquals(0, Reserva::count());
+        $this->assertEquals(0, Cobro::count());
+    }
+
+    public function test_check_in_exige_pago_total(): void
     {
         $this->actingAs($this->usuario)
             ->post('/reservas', $this->datosReserva(now()->toDateString(), now()->addDays(2)->toDateString()));
 
         $reserva = Reserva::first();
         $this->assertEquals(100.0, (float) $reserva->total);
+        $this->assertEquals(30.0, (float) Cobro::sum('monto'));
 
+        // el check-in exige el pago total: con saldo pendiente debe fallar
         $this->actingAs($this->usuario)
             ->post("/reservas/{$reserva->id}/check-in")
-            ->assertRedirect();
+            ->assertSessionHas('error', fn ($mensaje) => str_contains($mensaje, 'saldo pendiente'));
+        $this->assertEquals('confirmada', $reserva->fresh()->estado);
+        $this->assertEquals('disponible', $this->habitacion->fresh()->estado);
 
-        $this->assertEquals('hospedado', $reserva->fresh()->estado);
-        $this->assertEquals('ocupada', $this->habitacion->fresh()->estado);
-
-        // check-out con saldo pendiente debe fallar
-        $this->actingAs($this->usuario)
-            ->post("/reservas/{$reserva->id}/check-out")
-            ->assertSessionHas('error');
-        $this->assertEquals('hospedado', $reserva->fresh()->estado);
-
-        // cobro que excede el total debe fallar
+        // un cobro que excede el saldo pendiente debe fallar
         $this->actingAs($this->usuario)
             ->post("/reservas/{$reserva->id}/cobros", [
                 'monto' => 150,
@@ -155,63 +188,98 @@ class ReservaIntegridadTest extends TestCase
                 'fecha' => now()->toDateString(),
             ])
             ->assertSessionHas('error');
-        $this->assertEquals(0, Cobro::count());
+        $this->assertEquals(1, Cobro::count());
 
-        // cobro completo
+        // cobro del saldo restante
         $this->actingAs($this->usuario)
             ->post("/reservas/{$reserva->id}/cobros", [
-                'monto' => 100,
-                'metodo' => 'tarjeta',
+                'monto' => 70,
+                'metodo' => 'qr',
                 'concepto' => 'Estadía',
                 'fecha' => now()->toDateString(),
             ])
             ->assertRedirect("/reservas/{$reserva->id}/cobros");
-        $this->assertEquals(1, Cobro::count());
+        $this->assertEquals(2, Cobro::count());
 
-        // check-out ahora sí
+        // ahora sí el check-in procede
+        $this->actingAs($this->usuario)
+            ->post("/reservas/{$reserva->id}/check-in")
+            ->assertRedirect();
+        $this->assertEquals('hospedado', $reserva->fresh()->estado);
+        $this->assertEquals('ocupada', $this->habitacion->fresh()->estado);
+
+        // el check-out ya no exige saldo
+        $this->actingAs($this->usuario)
+            ->post("/reservas/{$reserva->id}/check-out")
+            ->assertRedirect();
+        $this->assertEquals('finalizada', $reserva->fresh()->estado);
+        $this->assertEquals('limpieza', $this->habitacion->fresh()->estado);
+
+        // marcar como limpia la deja disponible de nuevo
+        $this->actingAs($this->usuario)
+            ->post("/habitaciones/{$this->habitacion->id}/limpiar")
+            ->assertRedirect();
+        $this->assertEquals('disponible', $this->habitacion->fresh()->estado);
+    }
+
+    public function test_check_out_no_exige_saldo(): void
+    {
+        Reserva::create([
+            'habitacion_id' => $this->habitacion->id,
+            'huesped_id' => $this->huesped->id,
+            'fecha_entrada' => now()->subDay()->toDateString(),
+            'fecha_salida' => now()->addDay()->toDateString(),
+            'num_huespedes' => 1,
+            'estado' => 'hospedado',
+            'total' => 100,
+        ]);
+        $this->habitacion->update(['estado' => 'ocupada']);
+        $reserva = Reserva::first();
+
+        // sin cobros registrados el check-out debe proceder
         $this->actingAs($this->usuario)
             ->post("/reservas/{$reserva->id}/check-out")
             ->assertRedirect();
 
         $this->assertEquals('finalizada', $reserva->fresh()->estado);
-        $this->assertEquals('disponible', $this->habitacion->fresh()->estado);
+        $this->assertEquals('limpieza', $this->habitacion->fresh()->estado);
     }
 
-    public function test_no_se_puede_check_out_sin_saldar(): void
+    public function test_metodo_tarjeta_ya_no_es_valido(): void
     {
         $this->actingAs($this->usuario)
             ->post('/reservas', $this->datosReserva(now()->toDateString(), now()->addDay()->toDateString()));
 
         $reserva = Reserva::first();
 
-        $this->actingAs($this->usuario)->post("/reservas/{$reserva->id}/check-in");
-
         $this->actingAs($this->usuario)
             ->post("/reservas/{$reserva->id}/cobros", [
-                'monto' => 25,
-                'metodo' => 'efectivo',
-                'concepto' => 'Anticipo',
+                'monto' => 35,
+                'metodo' => 'tarjeta',
+                'concepto' => 'Estadía',
                 'fecha' => now()->toDateString(),
-            ]);
-
-        $this->actingAs($this->usuario)
-            ->post("/reservas/{$reserva->id}/check-out")
-            ->assertSessionHas('error');
-
-        $this->assertEquals('hospedado', $reserva->fresh()->estado);
+            ])
+            ->assertSessionHasErrors('metodo');
     }
 
     public function test_no_se_puede_editar_reserva_hospedada(): void
     {
-        $this->actingAs($this->usuario)
-            ->post('/reservas', $this->datosReserva(now()->toDateString(), now()->addDay()->toDateString()));
-
-        $reserva = Reserva::first();
-        $this->actingAs($this->usuario)->post("/reservas/{$reserva->id}/check-in");
+        $reserva = Reserva::create([
+            'habitacion_id' => $this->habitacion->id,
+            'huesped_id' => $this->huesped->id,
+            'fecha_entrada' => now()->subDay()->toDateString(),
+            'fecha_salida' => now()->addDay()->toDateString(),
+            'num_huespedes' => 1,
+            'estado' => 'hospedado',
+            'total' => 100,
+        ]);
+        $this->habitacion->update(['estado' => 'ocupada']);
 
         $this->actingAs($this->usuario)
             ->put("/reservas/{$reserva->id}", $this->datosReserva(now()->toDateString(), now()->addDays(3)->toDateString()))
             ->assertSessionHas('error');
+
+        $this->assertEquals('hospedado', $reserva->fresh()->estado);
     }
 
     public function test_no_se_puede_eliminar_habitacion_con_reservas_activas(): void
@@ -236,7 +304,7 @@ class ReservaIntegridadTest extends TestCase
         $reserva = Reserva::first();
 
         $this->actingAs($this->usuario)->post("/reservas/{$reserva->id}/cobros", [
-            'monto' => 50,
+            'monto' => 35,
             'metodo' => 'efectivo',
             'concepto' => 'Estadía',
             'fecha' => now()->toDateString(),

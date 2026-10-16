@@ -190,6 +190,40 @@
         </tr>
     </table>
 
+    <h3 class="section">Registros por QR y transferencia bancaria</h3>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Reserva</th>
+                <th>Huésped</th>
+                <th>Habitación</th>
+                <th>Método</th>
+                <th class="num">Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($detalleQrTransferencia as $fila)
+                <tr>
+                    <td>{{ $fila['fecha']->format('d/m/Y') }}</td>
+                    <td>#{{ $fila['reserva_id'] }}</td>
+                    <td>{{ $fila['huesped'] }}{{ $fila['documento'] ? ' ('.$fila['documento'].')' : '' }}</td>
+                    <td>Nº {{ $fila['habitacion'] }}</td>
+                    <td>{{ $fila['metodo_label'] }}</td>
+                    <td class="num {{ $fila['monto'] < 0 ? 'neg' : '' }}">{{ bs($fila['monto']) }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="6">Sin cobros por QR ni transferencia en el período.</td></tr>
+            @endforelse
+            @foreach ($totalesQrTransferencia as $total)
+                <tr class="total">
+                    <td colspan="5">Total {{ $total['metodo_label'] }} ({{ $total['cantidad'] }})</td>
+                    <td class="num">{{ bs($total['total']) }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
     <h3 class="section">Top habitaciones por ingresos</h3>
     <table class="data">
         <thead>

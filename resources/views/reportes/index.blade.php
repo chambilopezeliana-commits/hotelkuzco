@@ -172,6 +172,70 @@
 </div>
 
 <div class="card mb-6">
+    <div class="card-header">
+        <h2 class="card-title">Registros por QR y transferencia bancaria</h2>
+        <span class="text-xs text-slate-500">Detalle de cada pago recibido por estos medios</span>
+    </div>
+    @php
+        $filaQr = $totalesQrTransferencia->firstWhere('metodo', 'qr');
+        $filaTransferencia = $totalesQrTransferencia->firstWhere('metodo', 'transferencia');
+        $totalQrTransferencia = $totalesQrTransferencia->sum('total');
+    @endphp
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 px-5 py-4 border-b border-slate-100">
+        <div class="rounded-lg bg-slate-50 px-4 py-3">
+            <div class="stat-label">Total QR</div>
+            <div class="text-lg font-bold text-slate-900">{{ bs($filaQr['total'] ?? 0) }}</div>
+            <div class="text-xs text-slate-500">{{ $filaQr['cantidad'] ?? 0 }} pago(s)</div>
+        </div>
+        <div class="rounded-lg bg-slate-50 px-4 py-3">
+            <div class="stat-label">Total transferencia bancaria</div>
+            <div class="text-lg font-bold text-slate-900">{{ bs($filaTransferencia['total'] ?? 0) }}</div>
+            <div class="text-xs text-slate-500">{{ $filaTransferencia['cantidad'] ?? 0 }} pago(s)</div>
+        </div>
+        <div class="rounded-lg bg-slate-50 px-4 py-3">
+            <div class="stat-label">Total QR + transferencia</div>
+            <div class="text-lg font-bold text-slate-900">{{ bs($totalQrTransferencia) }}</div>
+            <div class="text-xs text-slate-500">{{ $detalleQrTransferencia->count() }} registro(s)</div>
+        </div>
+    </div>
+    @if ($detalleQrTransferencia->isEmpty())
+        <div class="empty-state">Sin cobros por QR ni transferencia en el período.</div>
+    @else
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Reserva</th>
+                        <th>Huésped</th>
+                        <th>Habitación</th>
+                        <th>Método</th>
+                        <th>Registrado por</th>
+                        <th class="text-right">Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($detalleQrTransferencia as $fila)
+                        <tr class="{{ $fila['anulado'] ? 'opacity-50' : '' }}">
+                            <td>{{ $fila['fecha']->format('d/m/Y') }}</td>
+                            <td>#{{ $fila['reserva_id'] }}</td>
+                            <td>
+                                <div class="font-medium">{{ $fila['huesped'] }}</div>
+                                <div class="text-xs text-slate-500">{{ $fila['documento'] }}</div>
+                            </td>
+                            <td>Nº {{ $fila['habitacion'] }}</td>
+                            <td>{{ $fila['metodo_label'] }}</td>
+                            <td>{{ $fila['registrado_por'] }}</td>
+                            <td class="text-right font-semibold {{ $fila['monto'] < 0 ? 'text-rose-600' : '' }}">{{ bs($fila['monto']) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+</div>
+
+<div class="card mb-6">
     <div class="card-header"><h2 class="card-title">Top habitaciones por ingresos</h2></div>
     @if ($topHabitaciones->isEmpty())
         <div class="empty-state">Sin ingresos registrados en el período.</div>

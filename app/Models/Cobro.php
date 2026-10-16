@@ -8,11 +8,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cobro extends Model
 {
-    public const METODOS = ['efectivo', 'tarjeta', 'transferencia'];
+    public const METODOS = ['efectivo', 'qr', 'transferencia'];
+
+    public const ETIQUETAS = [
+        'efectivo' => 'Efectivo',
+        'qr' => 'QR',
+        'transferencia' => 'Transferencia bancaria',
+    ];
 
     public const TIPO_PAGO = 'pago';
 
     public const TIPO_CONTRAASIENTO = 'contraasiento';
+
+    public static function etiqueta(?string $metodo): string
+    {
+        return self::ETIQUETAS[$metodo] ?? ucfirst((string) $metodo);
+    }
 
     protected $fillable = [
         'reserva_id',

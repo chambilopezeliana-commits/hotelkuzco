@@ -102,6 +102,37 @@
         </div>
 
         <div class="py-6 border-t border-slate-200">
+            <div class="stat-label mb-3">Registros por QR y transferencia bancaria</div>
+            @if ($detalleQrTransferencia->isEmpty())
+                <p class="text-sm text-slate-500">Sin cobros por QR ni transferencia en el período.</p>
+            @else
+                <table class="table">
+                    <thead>
+                        <tr><th>Fecha</th><th>Reserva</th><th>Huésped</th><th>Habitación</th><th>Método</th><th class="text-right">Monto</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($detalleQrTransferencia as $fila)
+                            <tr class="{{ $fila['anulado'] ? 'opacity-50' : '' }}">
+                                <td>{{ $fila['fecha']->format('d/m/Y') }}</td>
+                                <td>#{{ $fila['reserva_id'] }}</td>
+                                <td>{{ $fila['huesped'] }}{{ $fila['documento'] ? ' ('.$fila['documento'].')' : '' }}</td>
+                                <td>Nº {{ $fila['habitacion'] }}</td>
+                                <td>{{ $fila['metodo_label'] }}</td>
+                                <td class="text-right font-semibold {{ $fila['monto'] < 0 ? 'text-rose-600' : '' }}">{{ bs($fila['monto']) }}</td>
+                            </tr>
+                        @endforeach
+                        @foreach ($totalesQrTransferencia as $total)
+                            <tr class="bg-slate-50">
+                                <td colspan="5" class="font-bold">Total {{ $total['metodo_label'] }} ({{ $total['cantidad'] }})</td>
+                                <td class="text-right font-bold">{{ bs($total['total']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </div>
+
+        <div class="py-6 border-t border-slate-200">
             <div class="stat-label mb-3">Top habitaciones por ingresos</div>
             @if ($topHabitaciones->isEmpty())
                 <p class="text-sm text-slate-500">Sin ingresos registrados en el período.</p>

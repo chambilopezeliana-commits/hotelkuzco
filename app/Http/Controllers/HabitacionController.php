@@ -87,6 +87,20 @@ class HabitacionController extends Controller
         return redirect()->route('habitaciones.index')->with('exito', 'Habitación eliminada correctamente.');
     }
 
+    public function limpiar(Request $request, Habitacion $habitacion): RedirectResponse
+    {
+        if (! $habitacion->requiereLimpieza()) {
+            return back()->with('error', 'La habitación Nº '.$habitacion->numero.' no está pendiente de limpieza.');
+        }
+
+        $antes = $habitacion->toArray();
+        $habitacion->update(['estado' => 'disponible']);
+
+        Auditoria::registrar('actualizar', 'habitacion', $habitacion->id, 'Habitación Nº '.$habitacion->numero.' marcada como limpia', $antes, $habitacion->toArray());
+
+        return back()->with('exito', 'Habitación Nº '.$habitacion->numero.' limpia y disponible.');
+    }
+
     private function validar(Request $request, ?Habitacion $habitacion = null): array
     {
         $request->merge(['numero' => trim((string) $request->input('numero', ''))]);

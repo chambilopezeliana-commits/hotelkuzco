@@ -127,6 +127,9 @@ class ValidacionTiposTest extends TestCase
                 'fecha_salida' => '2027-01-03',
                 'num_huespedes' => 4,
                 'estado' => 'confirmada',
+                'anticipo_monto' => 30,
+                'anticipo_metodo' => 'efectivo',
+                'anticipo_fecha' => '2027-01-01',
             ])
             ->assertSessionHas('error', fn ($mensaje) => str_contains($mensaje, 'admite como máximo'));
 

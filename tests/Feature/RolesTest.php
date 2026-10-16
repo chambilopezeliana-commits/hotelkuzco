@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Habitacion;
 use App\Models\Huesped;
+use App\Models\TipoHabitacion;
 use App\Models\User;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,11 +58,16 @@ class RolesTest extends TestCase
 
     public function test_recepcionista_puede_crear_reservas(): void
     {
+        $tipo = TipoHabitacion::create([
+            'nombre' => 'Simple Test',
+            'tarifa' => 45,
+            'capacidad' => 2,
+            'activo' => true,
+        ]);
+
         $habitacion = Habitacion::create([
             'numero' => '101',
-            'tipo' => 'simple',
-            'capacidad' => 1,
-            'precio' => 45,
+            'tipo_habitacion_id' => $tipo->id,
             'estado' => 'disponible',
         ]);
 
@@ -70,6 +76,7 @@ class RolesTest extends TestCase
             'documento' => 'DNI-0001',
         ]);
 
+        // 3 noches × 45 = 135; anticipo mínimo = 30% = 40,50
         $this->actingAs($this->recepcionista())
             ->post('/reservas', [
                 'habitacion_id' => $habitacion->id,
@@ -78,6 +85,9 @@ class RolesTest extends TestCase
                 'fecha_salida' => '2027-03-04',
                 'num_huespedes' => 1,
                 'estado' => 'confirmada',
+                'anticipo_monto' => 40.5,
+                'anticipo_metodo' => 'efectivo',
+                'anticipo_fecha' => '2027-03-01',
             ])
             ->assertRedirect('/reservas');
 

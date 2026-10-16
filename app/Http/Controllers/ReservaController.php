@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cobro;
 use App\Models\Reserva;
 use App\Repositories\HabitacionRepository;
 use App\Repositories\HuespedRepository;
@@ -10,6 +11,8 @@ use App\Services\OperacionInvalida;
 use App\Services\ReservaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ReservaController extends Controller
@@ -58,25 +61,47 @@ class ReservaController extends Controller
         $datos = $this->validarWalkIn($request);
 
         try {
-            $reserva = $this->servicioReservas->walkIn($datos);
+            $this->servicioReservas->walkIn($datos, $request->user());
         } catch (OperacionInvalida $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('reservas.index')->with('exito', 'Check-in directo realizado correctamente.');
+        return redirect()->route('reservas.index')->with('exito', 'Check-in directo realizado. Pago total registrado.');
     }
 
     public function store(Request $request): RedirectResponse
     {
         $datos = $this->validar($request);
 
+        $anticipo = [
+            'monto' => round((float) $datos['anticipo_monto'], 2),
+            'metodo' => $datos['anticipo_metodo'],
+            'concepto' => 'Anticipo de reserva',
+            'fecha' => $datos['anticipo_fecha'],
+            'tipo' => Cobro::TIPO_PAGO,
+        ];
+        unset($datos['anticipo_monto'], $datos['anticipo_metodo'], $datos['anticipo_fecha']);
+
         try {
-            $this->servicioReservas->crear($datos);
+            DB::transaction(function () use ($datos, $anticipo, $request) {
+                $reserva = $this->servicioReservas->crear($datos);
+
+                $minimo = $this->servicioReservas->anticipoMinimo((float) $reserva->total);
+
+                if ($anticipo['monto'] < $minimo - 0.009) {
+                    throw new OperacionInvalida(
+                        'El anticipo mínimo para asegurar la reserva es '.bs($minimo)
+                        .' ('.config('hotel.anticipo_porcentaje').'% de '.bs($reserva->total).').'
+                    );
+                }
+
+                $this->servicioCobros->registrar($reserva, $anticipo, $request->user());
+            });
         } catch (OperacionInvalida $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('reservas.index')->with('exito', 'Reserva creada correctamente.');
+        return redirect()->route('reservas.index')->with('exito', 'Reserva creada y anticipo registrado.');
     }
 
     public function edit(Reserva $reserva): View
@@ -137,13 +162,12 @@ class ReservaController extends Controller
     public function checkOut(Reserva $reserva): RedirectResponse
     {
         try {
-            $saldo = $this->servicioCobros->saldoPendiente($reserva);
-            $this->servicioReservas->checkOut($reserva, $saldo);
+            $this->servicioReservas->checkOut($reserva);
         } catch (OperacionInvalida $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('exito', 'Check-out finalizado. Estadía cerrada.');
+        return back()->with('exito', 'Check-out finalizado. La habitación pasó a limpieza.');
     }
 
     private function validar(Request $request, ?Reserva $reserva = null): array
@@ -154,7 +178,7 @@ class ReservaController extends Controller
             $estadosEditables[] = $reserva->estado;
         }
 
-        $datos = $request->validate([
+        $reglas = [
             'habitacion_id' => ['required', 'exists:habitaciones,id'],
             'huesped_id' => ['required', 'exists:huespedes,id'],
             'fecha_entrada' => ['required', 'date'],
@@ -162,7 +186,9 @@ class ReservaController extends Controller
             'num_huespedes' => ['required', 'integer', 'min:1', 'max:20'],
             'estado' => ['required', 'in:'.implode(',', $estadosEditables)],
             'notas' => ['nullable', 'string', 'max:1000'],
-        ], [
+        ];
+
+        $mensajes = [
             'habitacion_id.required' => 'Debe seleccionar una habitación.',
             'habitacion_id.exists' => 'La habitación seleccionada no existe.',
             'huesped_id.required' => 'Debe seleccionar el huésped.',
@@ -171,9 +197,20 @@ class ReservaController extends Controller
             'fecha_salida.required' => 'La fecha de salida es obligatoria.',
             'fecha_salida.after' => 'La fecha de salida debe ser posterior a la de entrada.',
             'estado.in' => 'Estado no válido.',
-        ]);
+        ];
 
-        return $datos;
+        if (! $reserva) {
+            $reglas['anticipo_monto'] = ['required', 'numeric', 'min:0.01'];
+            $reglas['anticipo_metodo'] = ['required', Rule::in(Cobro::METODOS)];
+            $reglas['anticipo_fecha'] = ['required', 'date'];
+
+            $mensajes['anticipo_monto.required'] = 'Debe registrar el anticipo para asegurar la reserva.';
+            $mensajes['anticipo_monto.min'] = 'El anticipo debe ser mayor a 0.';
+            $mensajes['anticipo_metodo.required'] = 'Debe seleccionar el método de pago del anticipo.';
+            $mensajes['anticipo_fecha.required'] = 'Debe indicar la fecha del anticipo.';
+        }
+
+        return $request->validate($reglas, $mensajes);
     }
 
     private function validarWalkIn(Request $request): array
@@ -183,9 +220,11 @@ class ReservaController extends Controller
             'huesped_id' => ['required', 'exists:huespedes,id'],
             'fecha_salida' => ['required', 'date', 'after:today'],
             'num_huespedes' => ['required', 'integer', 'min:1', 'max:20'],
+            'metodo_pago' => ['required', Rule::in(Cobro::METODOS)],
             'notas' => ['nullable', 'string', 'max:1000'],
         ], [
             'fecha_salida.after' => 'La fecha de salida debe ser posterior a hoy.',
+            'metodo_pago.required' => 'Debe seleccionar el método de pago.',
         ]);
 
         return $datos;

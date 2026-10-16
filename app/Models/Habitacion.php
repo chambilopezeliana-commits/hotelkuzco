@@ -8,7 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Habitacion extends Model
 {
-    public const ESTADOS = ['disponible', 'ocupada', 'mantenimiento'];
+    public const ESTADOS = ['disponible', 'ocupada', 'mantenimiento', 'limpieza'];
+
+    public const ESTADOS_NO_DISPONIBLES = ['mantenimiento', 'limpieza'];
+
+    public function requiereLimpieza(): bool
+    {
+        return $this->estado === 'limpieza';
+    }
 
     protected $table = 'habitaciones';
 
