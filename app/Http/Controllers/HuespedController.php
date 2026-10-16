@@ -80,6 +80,7 @@ class HuespedController extends Controller
             'required',
             'string',
             'max:30',
+            'regex:/^(?=.*[A-Za-z0-9])[A-Za-z0-9\s\-\/\.]+$/',
         ];
 
         if ($huesped) {
@@ -115,6 +116,7 @@ class HuespedController extends Controller
             'tipo_documento.required' => 'El tipo de documento es obligatorio.',
             'tipo_documento.in' => 'El tipo de documento no es válido.',
             'documento.required' => 'El documento es obligatorio.',
+            'documento.regex' => 'El número de documento admite letras, números, espacios y los signos - . /',
             'telefono.regex' => 'El teléfono solo admite números, espacios y los signos + - ( ).',
         ]);
     }

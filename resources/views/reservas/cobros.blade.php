@@ -25,7 +25,7 @@
         <div>
             <div class="stat-label">Habitación</div>
             <div class="font-semibold text-slate-900 mt-1">Nº {{ $reserva->habitacion->numero }}</div>
-            <div class="text-xs text-slate-500">{{ ucfirst($reserva->habitacion->tipo) }}</div>
+            <div class="text-xs text-slate-500">{{ $reserva->habitacion->tipo ? ucfirst($reserva->habitacion->tipo) : '—' }}</div>
         </div>
         <div>
             <div class="stat-label">Estadía</div>
@@ -146,7 +146,7 @@
                                         <button class="btn btn-sm btn-secondary" type="submit">Anular</button>
                                     </form>
                                 @endif
-                                @if (! $cobro->anulado && ! $cobro->esContraasiento() && ! in_array($reserva->estado, ['finalizada']))
+                                @if (auth()->user()->esAdmin() && ! $cobro->anulado && ! $cobro->esContraasiento() && ! in_array($reserva->estado, ['finalizada']))
                                     <form method="POST" action="{{ route('cobros.destroy', $cobro->id) }}" onsubmit="return confirm('¿Eliminar este cobro?')">
                                         @csrf
                                         @method('DELETE')

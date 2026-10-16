@@ -40,16 +40,29 @@ class ReporteController extends Controller
 
     private function datos(Request $request): array
     {
-        $desde = $request->filled('desde')
-            ? Carbon::parse($request->get('desde'))->startOfDay()
+        $entrada = $request->validate([
+            'desde' => ['nullable', 'date'],
+            'hasta' => ['nullable', 'date'],
+        ], [
+            'desde.date' => 'La fecha "desde" no es válida.',
+            'hasta.date' => 'La fecha "hasta" no es válida.',
+        ]);
+
+        $desde = ! empty($entrada['desde'])
+            ? Carbon::parse($entrada['desde'])->startOfDay()
             : Carbon::now()->startOfMonth();
 
-        $hasta = $request->filled('hasta')
-            ? Carbon::parse($request->get('hasta'))->endOfDay()
+        $hasta = ! empty($entrada['hasta'])
+            ? Carbon::parse($entrada['hasta'])->endOfDay()
             : Carbon::now()->endOfDay();
 
         if ($hasta->lt($desde)) {
             [$desde, $hasta] = [$hasta->copy()->startOfDay(), $desde->copy()->endOfDay()];
+        }
+
+        $tope = $desde->copy()->addYear();
+        if ($hasta->gt($tope)) {
+            $hasta = $tope->copy()->endOfDay();
         }
 
         $nochesPeriodo = max(1, (int) $desde->startOfDay()->diffInDays($hasta->copy()->addDay()->startOfDay()));

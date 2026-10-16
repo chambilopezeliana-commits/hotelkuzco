@@ -14,9 +14,10 @@ class HabitacionSeeder extends Seeder
 
         $plan = [
             'Simple' => ['desde' => 101, 'cantidad' => 8, 'descripcion' => 'Individual, cama sencilla, baño privado'],
-            'Doble' => ['desde' => 201, 'cantidad' => 10, 'descripcion' => 'Cama doble, TV, aire acondicionado'],
-            'Familiar' => ['desde' => 301, 'cantidad' => 8, 'descripcion' => 'Dos camas dobles, espacio para familia'],
-            'Suite' => ['desde' => 401, 'cantidad' => 6, 'descripcion' => 'Sala de estar, jacuzzi, vista panorámica'],
+            'Doble' => ['desde' => 201, 'cantidad' => 8, 'descripcion' => 'Cama doble, TV, aire acondicionado'],
+            'Triple' => ['desde' => 301, 'cantidad' => 4, 'descripcion' => 'Tres camas, ideal para grupos o familias pequeñas'],
+            'Familiar' => ['desde' => 401, 'cantidad' => 6, 'descripcion' => 'Dos camas dobles, espacio para familia'],
+            'Suite' => ['desde' => 501, 'cantidad' => 6, 'descripcion' => 'Sala de estar, jacuzzi, vista panorámica'],
         ];
 
         foreach ($plan as $tipo => $datos) {
@@ -34,6 +35,7 @@ class HabitacionSeeder extends Seeder
             }
         }
 
-        Habitacion::where('numero', '403')->update(['estado' => 'mantenimiento']);
+        // Deja una suite en mantenimiento como ejemplo.
+        Habitacion::where('numero', '503')->update(['estado' => 'mantenimiento']);
     }
 }

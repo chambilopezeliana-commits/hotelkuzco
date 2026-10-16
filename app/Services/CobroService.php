@@ -137,6 +137,14 @@ class CobroService
             throw new OperacionInvalida('No se pueden eliminar cobros de una reserva finalizada.');
         }
 
+        if ($cobro->anulado || $cobro->esContraasiento()) {
+            throw new OperacionInvalida('No se puede eliminar un cobro anulado o un contraasiento.');
+        }
+
+        if ($cobro->contraasientos()->exists()) {
+            throw new OperacionInvalida('No se puede eliminar: el cobro tiene un contraasiento asociado.');
+        }
+
         $this->cobros->eliminar($cobro);
     }
 }

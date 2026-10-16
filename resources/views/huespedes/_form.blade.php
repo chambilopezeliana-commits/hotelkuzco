@@ -19,9 +19,9 @@
 
     <div>
         <label for="documento" class="label">Número de documento *</label>
-        <input type="text" id="documento" name="documento" class="input" value="{{ old('documento', $huesped->documento ?? '') }}" required>
+        <input type="text" id="documento" name="documento" class="input" value="{{ old('documento', $huesped->documento ?? '') }}" maxlength="30" placeholder="Ej.: 1234567, 1234567-1A" required>
         @error('documento') <div class="error-text">{{ $message }}</div> @enderror
-        <div class="hint">La combinación tipo + número debe ser única.</div>
+        <div class="hint">Admite letras y números (p. ej. CI boliviana con complemento). La combinación tipo + número debe ser única.</div>
     </div>
 
     <div>

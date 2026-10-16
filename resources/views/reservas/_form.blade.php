@@ -25,7 +25,7 @@
                 <option value="{{ $habitacion->id }}"
                     data-precio="{{ $habitacion->precio }}"
                     {{ old('habitacion_id', $reserva->habitacion_id ?? '') == $habitacion->id ? 'selected' : '' }}>
-                    Nº {{ $habitacion->numero }} · {{ ucfirst($habitacion->tipo) }} ({{ bs($habitacion->precio) }}/noche)
+                    Nº {{ $habitacion->numero }} · {{ $habitacion->tipo ? ucfirst($habitacion->tipo) : '—' }} ({{ bs($habitacion->precio) }}/noche)
                     {{ $habitacion->estado === 'mantenimiento' ? '— En mantenimiento' : '' }}
                 </option>
             @endforeach

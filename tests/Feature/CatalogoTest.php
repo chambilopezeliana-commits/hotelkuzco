@@ -32,7 +32,7 @@ class CatalogoTest extends TestCase
             ->assertSee('Doble')
             ->assertSee('250,00')
             ->assertSee('201')
-            ->assertSee('habitacion-doble.jpeg');
+            ->assertSee('habitacion-doble.jpg');
     }
 
     public function test_el_catalogo_muestra_instalaciones_y_galeria(): void
@@ -43,20 +43,21 @@ class CatalogoTest extends TestCase
             ->assertSee('Área de descanso')
             ->assertSee('Comedor')
             ->assertSee('Piscina')
-            ->assertSee('img/hotel/recepcion.jpeg')
-            ->assertSee('img/hotel/descanso.jpeg')
-            ->assertSee('img/hotel/comedor.jpeg')
-            ->assertSee('img/hotel/piscina.jpeg');
+            ->assertSee('img/hotel-kuzco/recepcion.jpg')
+            ->assertSee('img/hotel-kuzco/descanso.jpg')
+            ->assertSee('img/hotel-kuzco/comedor.jpg')
+            ->assertSee('img/hotel-kuzco/piscina.jpg');
     }
 
     public function test_las_imagenes_del_catalogo_existen(): void
     {
         foreach ([
-            'hero.jpeg', 'habitacion-simple.jpeg', 'habitacion-doble.jpeg',
-            'habitacion-familiar.jpeg', 'suite.jpeg', 'recepcion.jpeg',
-            'descanso.jpeg', 'comedor.jpeg', 'piscina.jpeg',
+            'hero.jpg', 'habitacion-simple.jpg', 'habitacion-doble.jpg',
+            'habitacion-familiar.jpg', 'habitacion-triple.jpg', 'suite.jpg',
+            'recepcion.jpg', 'descanso.jpg', 'comedor.jpg', 'piscina.jpg',
+            'juegos.jpg',
         ] as $archivo) {
-            $this->assertFileExists(public_path('img/hotel/'.$archivo));
+            $this->assertFileExists(public_path('img/hotel-kuzco/'.$archivo));
         }
     }
 

@@ -36,7 +36,7 @@
                         <option value="">Seleccione una habitación...</option>
                         @foreach ($habitaciones as $habitacion)
                             <option value="{{ $habitacion->id }}" {{ old('habitacion_id') == $habitacion->id ? 'selected' : '' }}>
-                                Nº {{ $habitacion->numero }} · {{ ucfirst($habitacion->tipo) }} ({{ bs($habitacion->precio) }}/noche)
+                                Nº {{ $habitacion->numero }} · {{ $habitacion->tipo ? ucfirst($habitacion->tipo) : '—' }} ({{ bs($habitacion->precio) }}/noche)
                             </option>
                         @endforeach
                     </select>

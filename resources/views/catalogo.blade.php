@@ -175,10 +175,19 @@
                                 <span class="font-semibold text-[#4a3220]">{{ $tipo['numeros'] ? implode(' · ', $tipo['numeros']) : '—' }}</span>
                             </div>
 
-                            <a href="{{ $whatsappUrl }}?text={{ $mensaje }}" target="_blank" rel="noopener"
-                               class="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#e6c877] to-[#c89b3c] px-5 py-3 font-semibold text-[#2a1a0f] hover:brightness-110 transition">
-                                Reservar por WhatsApp
-                            </a>
+                            <div class="mt-5 flex items-center gap-2">
+                                <a href="{{ $whatsappUrl }}?text={{ $mensaje }}" target="_blank" rel="noopener"
+                                   class="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#e6c877] to-[#c89b3c] px-5 py-3 font-semibold text-[#2a1a0f] hover:brightness-110 transition">
+                                    Reservar por WhatsApp
+                                </a>
+                                <button type="button"
+                                        data-ver-imagen="{{ $tipo['imagen'] }}"
+                                        data-ver-titulo="Habitación {{ $tipo['nombre'] }}"
+                                        class="inline-flex items-center justify-center gap-2 rounded-full border border-[#c89b3c]/50 px-5 py-3 font-semibold text-[#8a6a48] hover:bg-[#c89b3c]/10 hover:text-[#2a1a0f] transition">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    Ver
+                                </button>
+                            </div>
                         </div>
                     </article>
                 @endforeach
@@ -358,6 +367,57 @@
             <a href="{{ route('login') }}" class="hover:text-[#e6c877] transition">Acceso al sistema</a>
         </div>
     </footer>
+
+    <!-- Visor de habitación ampliada -->
+    <div id="modalHabitacion" class="fixed inset-0 z-50 hidden items-center justify-center bg-[#2a1a0f]/90 p-4">
+        <button type="button" id="cerrarModal" aria-label="Cerrar"
+                class="absolute top-5 right-5 h-11 w-11 rounded-full bg-[#2a1a0f]/70 border border-[#c89b3c]/40 text-[#e6c877] hover:bg-[#c89b3c] hover:text-[#2a1a0f] transition flex items-center justify-center">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <figure class="w-full max-w-5xl text-center">
+            <img id="imagenModal" src="" alt=""
+                 class="mx-auto max-h-[85vh] w-auto rounded-2xl border border-[#c89b3c]/30 object-contain shadow-2xl shadow-black/60">
+            <figcaption id="tituloModal" class="mt-4 font-display text-lg tracking-[0.3em] text-[#e6c877] uppercase"></figcaption>
+        </figure>
+    </div>
+
+    <script>
+        (function () {
+            var modal = document.getElementById('modalHabitacion');
+            if (!modal) return;
+            var imagen = document.getElementById('imagenModal');
+            var titulo = document.getElementById('tituloModal');
+            var cerrarBtn = document.getElementById('cerrarModal');
+
+            function abrir(src, texto) {
+                imagen.src = src;
+                imagen.alt = texto || '';
+                titulo.textContent = texto || '';
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function cerrar() {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                imagen.src = '';
+                document.body.classList.remove('overflow-hidden');
+            }
+
+            document.querySelectorAll('[data-ver-imagen]').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    abrir(boton.getAttribute('data-ver-imagen'), boton.getAttribute('data-ver-titulo'));
+                });
+            });
+
+            cerrarBtn.addEventListener('click', cerrar);
+            modal.addEventListener('click', function (e) { if (e.target === modal) cerrar(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) cerrar();
+            });
+        })();
+    </script>
 
 </body>
 </html>

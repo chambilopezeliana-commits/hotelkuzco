@@ -37,11 +37,13 @@ class ReservaSeeder extends Seeder
             ['202', '20345678', -3, 1, 2, 'hospedado', 300],
             ['203', '40567890', 10, 14, 2, 'confirmada', null],
             ['204', '50678901', -1, 2, 2, 'hospedado', null],
-            ['301', '60789012', -15, -12, 4, 'finalizada', 'total'],
-            ['302', '10234567', 7, 11, 3, 'confirmada', 350],
-            ['401', '30456789', -6, -2, 2, 'finalizada', 'total'],
-            ['401', '20345678', 20, 23, 2, 'pendiente', null],
-            ['402', '40567890', -2, 3, 3, 'hospedado', 1000],
+            ['301', '20345678', 1, 4, 3, 'confirmada', null],
+            ['302', '40567890', -4, -1, 3, 'finalizada', 'total'],
+            ['401', '60789012', -15, -12, 4, 'finalizada', 'total'],
+            ['402', '10234567', 7, 11, 3, 'confirmada', 350],
+            ['501', '30456789', -6, -2, 2, 'finalizada', 'total'],
+            ['501', '20345678', 20, 23, 2, 'pendiente', null],
+            ['502', '40567890', -2, 3, 3, 'hospedado', 1000],
         ];
 
         foreach ($ejemplos as [$numero, $documento, $entrada, $salida, $personas, $estado, $pago]) {
