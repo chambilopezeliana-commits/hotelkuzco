@@ -8,6 +8,7 @@ use App\Repositories\HabitacionRepository;
 use App\Repositories\TipoHabitacionRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class HabitacionController extends Controller
@@ -75,14 +76,20 @@ class HabitacionController extends Controller
     {
         abort_unless($request->user()->esAdmin(), 403);
 
+        // Validación previa: no eliminar habitaciones con relaciones activas (reservas en curso).
         if ($this->habitaciones->tieneReservasActivas($habitacion->id)) {
             return back()->with('error', 'No se puede eliminar: la habitación tiene reservas activas.');
         }
 
         $antes = $habitacion->toArray();
+
+        // Baja lógica: se desocupa el número único (prefijo 0, que no colisiona
+        // con la numeración real de pisos 101–506) para permitir reutilizarlo.
+        $habitacion->update(['numero' => '0'.$habitacion->id]);
+
         $this->habitaciones->eliminar($habitacion);
 
-        Auditoria::registrar('eliminar', 'habitacion', $habitacion->id, 'Habitación eliminada', $antes, []);
+        Auditoria::registrar('eliminar', 'habitacion', $habitacion->id, 'Habitación eliminada (baja lógica)', $antes, []);
 
         return redirect()->route('habitaciones.index')->with('exito', 'Habitación eliminada correctamente.');
     }
@@ -106,7 +113,9 @@ class HabitacionController extends Controller
         $request->merge(['numero' => trim((string) $request->input('numero', ''))]);
 
         $reglas = [
-            'numero' => ['required', 'string', 'max:20', 'regex:/^[0-9]+$/', 'unique:habitaciones,numero'.($habitacion ? ','.$habitacion->id : '')],
+            'numero' => ['required', 'string', 'max:20', 'regex:/^[0-9]+$/', Rule::unique('habitaciones', 'numero')
+                ->whereNull('deleted_at')
+                ->ignore($habitacion?->id)],
             'tipo_habitacion_id' => ['required', 'exists:tipos_habitacion,id'],
             'estado' => ['required', 'in:'.implode(',', Habitacion::ESTADOS)],
             'descripcion' => ['nullable', 'string', 'max:500'],

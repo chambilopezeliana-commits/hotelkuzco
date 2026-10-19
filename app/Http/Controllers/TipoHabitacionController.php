@@ -8,6 +8,7 @@ use App\Repositories\TipoHabitacionRepository;
 use App\Rules\SoloLetras;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class TipoHabitacionController extends Controller
@@ -65,14 +66,19 @@ class TipoHabitacionController extends Controller
     {
         abort_unless($request->user()->esAdmin(), 403);
 
+        // Validación previa: no eliminar tipos con relaciones activas (habitaciones asociadas).
         if ($this->tipos->tieneHabitaciones($tipo_habitacion->id)) {
             return back()->with('error', 'No se puede eliminar: hay habitaciones asociadas a este tipo.');
         }
 
         $antes = $tipo_habitacion->toArray();
+
+        // Baja lógica: se desocupa el nombre único para permitir recrear el tipo.
+        $tipo_habitacion->update(['nombre' => 'ELIMINADO #'.$tipo_habitacion->id]);
+
         $this->tipos->eliminar($tipo_habitacion);
 
-        Auditoria::registrar('eliminar', 'tipo_habitacion', $tipo_habitacion->id, 'Tipo de habitación eliminado', $antes, []);
+        Auditoria::registrar('eliminar', 'tipo_habitacion', $tipo_habitacion->id, 'Tipo de habitación eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('tipos-habitacion.index')->with('exito', 'Tipo de habitación eliminado correctamente.');
     }
@@ -80,7 +86,9 @@ class TipoHabitacionController extends Controller
     private function validar(Request $request, ?TipoHabitacion $tipo = null): array
     {
         return $request->validate([
-            'nombre' => ['required', 'string', 'max:100', new SoloLetras, 'unique:tipos_habitacion,nombre'.($tipo ? ','.$tipo->id : '')],
+            'nombre' => ['required', 'string', 'max:100', new SoloLetras, Rule::unique('tipos_habitacion', 'nombre')
+                ->whereNull('deleted_at')
+                ->ignore($tipo?->id)],
             'tarifa' => ['required', 'numeric', 'min:0'],
             'capacidad' => ['required', 'integer', 'min:1', 'max:20'],
             'descripcion' => ['nullable', 'string', 'max:500'],

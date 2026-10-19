@@ -54,6 +54,7 @@ class HuespedController extends Controller
 
     public function destroy(Huesped $huesped): RedirectResponse
     {
+        // Validación previa: no eliminar huéspedes con relaciones activas (reservas en curso).
         $activas = $huesped->reservas()
             ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
             ->count();
@@ -63,8 +64,13 @@ class HuespedController extends Controller
         }
 
         $antes = $huesped->toArray();
+
+        // Baja lógica: se desocupa el documento único (tipo_documento + documento)
+        // para permitir registrar un nuevo huésped con ese documento.
+        $huesped->update(['documento' => 'ELIM-'.$huesped->id]);
+
         $this->huespedes->eliminar($huesped);
-        Auditoria::registrar('eliminar', 'huesped', $huesped->id, 'Huésped eliminado', $antes, []);
+        Auditoria::registrar('eliminar', 'huesped', $huesped->id, 'Huésped eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('huespedes.index')->with('exito', 'Huésped eliminado correctamente.');
     }
@@ -88,6 +94,7 @@ class HuespedController extends Controller
                 $existe = Huesped::where('tipo_documento', $request->input('tipo_documento'))
                     ->where('documento', $value)
                     ->where('id', '!=', $huesped->id)
+                    ->whereNull('deleted_at')
                     ->exists();
                 if ($existe) {
                     $fail('Ya existe un huésped con ese documento.');
@@ -97,6 +104,7 @@ class HuespedController extends Controller
             $reglasDocumento[] = function ($attribute, $value, $fail) use ($request) {
                 $existe = Huesped::where('tipo_documento', $request->input('tipo_documento'))
                     ->where('documento', $value)
+                    ->whereNull('deleted_at')
                     ->exists();
                 if ($existe) {
                     $fail('Ya existe un huésped con ese documento.');

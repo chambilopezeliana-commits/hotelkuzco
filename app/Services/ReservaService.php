@@ -147,6 +147,13 @@ class ReservaService
             throw new OperacionInvalida('No se puede eliminar una reserva con huésped hospedado. Realice el check-out.');
         }
 
+        // Validación previa: la reserva no debe tener dependencias financieras activas.
+        if ($reserva->cobros()->exists()) {
+            throw new OperacionInvalida(
+                'No se puede eliminar: la reserva #'.$reserva->id.' tiene cobros registrados. Anule los cobros antes de eliminarla.'
+            );
+        }
+
         $datos = $reserva->only(['habitacion_id', 'huesped_id', 'fecha_entrada', 'fecha_salida', 'estado', 'total']);
 
         DB::transaction(function () use ($reserva) {

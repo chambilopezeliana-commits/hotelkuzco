@@ -41,13 +41,13 @@ return [
     | Session Encryption
     |--------------------------------------------------------------------------
     |
-    | This option allows you to easily specify that all of your session data
-    | should be encrypted before it's stored. All encryption is performed
-    | automatically by Laravel and you may use the session like normal.
+    | Permite especificar que todos los datos de sesión se cifren antes de
+    | almacenarse. Activado por defecto: protege el contenido de la sesión
+    | en reposo (driver "database"/"file") ante robo del almacén.
     |
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    'encrypt' => env('SESSION_ENCRYPT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -163,13 +163,15 @@ return [
     | HTTPS Only Cookies
     |--------------------------------------------------------------------------
     |
-    | By setting this option to true, session cookies will only be sent back
-    | to the server if the browser has a HTTPS connection. This will keep
-    | the cookie from being sent to you when it can't be done securely.
+    | Con true, la cookie de sesión solo se envía sobre conexiones HTTPS,
+    | impidiendo su interceptación en red (mitigación de secuestro de sesión
+    | por tráfico HTTP). Por defecto se activa automáticamente cuando
+    | APP_ENV=production; en desarrollo local (HTTP) puede forzarse a false
+    | con SESSION_SECURE_COOKIE=false en .env.
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
 
     /*
     |--------------------------------------------------------------------------
@@ -189,9 +191,9 @@ return [
     | Same-Site Cookies
     |--------------------------------------------------------------------------
     |
-    | This option determines how your cookies behave when cross-site requests
-    | take place, and can be used to mitigate CSRF attacks. By default, we
-    | will set this value to "lax" to permit secure cross-site requests.
+    | Determina cómo se comportan las cookies ante peticiones cross-site y
+    | mitiga ataques CSRF a nivel de cookie. "lax" es el equilibrio recomendado
+    | (bloquea envíos cross-site de la cookie en POSTs de terceros).
     |
     | See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#samesitesamesite-value
     |

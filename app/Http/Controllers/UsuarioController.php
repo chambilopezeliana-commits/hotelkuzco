@@ -8,6 +8,8 @@ use App\Repositories\UsuarioRepository;
 use App\Rules\SoloLetras;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class UsuarioController extends Controller
@@ -61,13 +63,24 @@ class UsuarioController extends Controller
             return back()->with('error', 'No puede eliminar su propio usuario.');
         }
 
+        // Validación previa: el usuario no debe tener dependencias activas (cobros registrados).
         if ($usuario->cobros()->exists()) {
             return back()->with('error', 'No se puede eliminar: el usuario tiene cobros registrados.');
         }
 
         $antes = $usuario->toArray();
+
+        // Baja lógica: además de Soft Deletes se desocupan las claves únicas
+        // y se revocan credenciales para liberar el email y bloquear el acceso.
+        $usuario->update([
+            'email' => 'user-'.$usuario->id.'@eliminado.invalid',
+            'password' => Str::random(40),
+            'remember_token' => null,
+            'activo' => false,
+        ]);
+
         $this->usuarios->eliminar($usuario);
-        Auditoria::registrar('eliminar', 'usuario', $usuario->id, 'Usuario eliminado', $antes, []);
+        Auditoria::registrar('eliminar', 'usuario', $usuario->id, 'Usuario eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('usuarios.index')->with('exito', 'Usuario eliminado correctamente.');
     }
@@ -95,7 +108,9 @@ class UsuarioController extends Controller
 
         return $request->validate([
             'name' => ['required', 'string', 'max:100', new SoloLetras],
-            'email' => ['required', 'email', 'unique:users,email'.($usuario ? ','.$usuario->id : '')],
+            'email' => ['required', 'email', Rule::unique('users', 'email')
+                ->whereNull('deleted_at')
+                ->ignore($usuario?->id)],
             'role' => ['required', 'in:administrador,recepcionista'],
             'password' => $password,
         ], [
