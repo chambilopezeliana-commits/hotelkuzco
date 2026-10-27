@@ -8,6 +8,7 @@ use App\Repositories\UsuarioRepository;
 use App\Rules\SoloLetras;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -50,8 +51,25 @@ class UsuarioController extends Controller
             unset($datos['password']);
         }
 
+        if (
+            $usuario->role === User::ROLE_ADMIN
+            && ($datos['role'] ?? $usuario->role) !== User::ROLE_ADMIN
+            && ! User::query()
+                ->where('role', User::ROLE_ADMIN)
+                ->where('activo', true)
+                ->whereKeyNot($usuario->id)
+                ->exists()
+        ) {
+            return back()->withInput()->with('error', 'No se puede cambiar el rol del ultimo administrador activo.');
+        }
+
         $antes = $usuario->toArray();
         $usuario = $this->usuarios->actualizar($usuario, $datos);
+
+        if (array_key_exists('password', $datos)) {
+            $usuario->tokens()->delete();
+        }
+
         Auditoria::registrar('actualizar', 'usuario', $usuario->id, 'Usuario actualizado', $antes, $usuario->toArray());
 
         return redirect()->route('usuarios.index')->with('exito', 'Usuario actualizado correctamente.');
@@ -64,7 +82,7 @@ class UsuarioController extends Controller
         }
 
         // Validación previa: el usuario no debe tener dependencias activas (cobros registrados).
-        if ($usuario->cobros()->exists()) {
+        if ($usuario->cobros()->withTrashed()->exists()) {
             return back()->with('error', 'No se puede eliminar: el usuario tiene cobros registrados.');
         }
 
@@ -72,14 +90,19 @@ class UsuarioController extends Controller
 
         // Baja lógica: además de Soft Deletes se desocupan las claves únicas
         // y se revocan credenciales para liberar el email y bloquear el acceso.
-        $usuario->update([
-            'email' => 'user-'.$usuario->id.'@eliminado.invalid',
-            'password' => Str::random(40),
-            'remember_token' => null,
-            'activo' => false,
-        ]);
+        $emailEliminado = $this->emailEliminado($usuario);
 
-        $this->usuarios->eliminar($usuario);
+        DB::transaction(function () use ($usuario, $emailEliminado) {
+            $usuario->update([
+                'email' => $emailEliminado,
+                'password' => Str::random(40),
+                'remember_token' => null,
+                'activo' => false,
+            ]);
+
+            $usuario->tokens()->delete();
+            $this->usuarios->eliminar($usuario);
+        });
         Auditoria::registrar('eliminar', 'usuario', $usuario->id, 'Usuario eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('usuarios.index')->with('exito', 'Usuario eliminado correctamente.');
@@ -94,12 +117,27 @@ class UsuarioController extends Controller
         }
 
         $usuario->activo = ! $usuario->activo;
+
+        if (! $usuario->activo) {
+            $usuario->remember_token = null;
+            $usuario->tokens()->delete();
+        }
+
         $usuario->save();
 
         $accion = $usuario->activo ? 'activar' : 'desactivar';
         Auditoria::registrar($accion, 'usuario', $usuario->id, 'Usuario '.$accion, [], ['activo' => $usuario->activo]);
 
         return back()->with('exito', 'Estado del usuario actualizado correctamente.');
+    }
+
+    private function emailEliminado(User $usuario): string
+    {
+        do {
+            $email = 'user-'.$usuario->id.'-'.Str::lower(Str::random(8)).'@eliminado.invalid';
+        } while (User::withTrashed()->where('email', $email)->exists());
+
+        return $email;
     }
 
     private function validar(Request $request, ?User $usuario = null): array

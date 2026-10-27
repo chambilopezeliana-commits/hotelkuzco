@@ -1,12 +1,16 @@
 .git
 .gitignore
-.env
+.env*
 node_modules
 vendor
+public/build
+public/hot
 database/database.sqlite
 storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
 storage/testing
+tests
+docs
 .phpunit.result.cache

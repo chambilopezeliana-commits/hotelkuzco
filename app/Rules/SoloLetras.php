@@ -17,8 +17,8 @@ class SoloLetras implements ValidationRule
             return;
         }
 
-        if (! preg_match('/^[\p{L}]+(?: [\p{L}]+)*$/u', trim($value))) {
-            $fail('Este campo solo debe contener letras y espacios, sin números ni signos.');
+        if (! preg_match("/^[\p{L}]+(?:[ '\-]+[\p{L}]+)*$/u", trim($value))) {
+            $fail('Este campo solo debe contener letras, espacios, apostrofes y guiones.');
         }
     }
 }

@@ -39,6 +39,11 @@ class Habitacion extends Model
         return $this->hasMany(Reserva::class);
     }
 
+    public function nochesOcupadas(): HasMany
+    {
+        return $this->hasMany(ReservaNoche::class);
+    }
+
     public function getTipoAttribute(): ?string
     {
         return $this->tipoHabitacion?->nombre;

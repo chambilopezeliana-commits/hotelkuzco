@@ -26,17 +26,23 @@ class ReservaController extends Controller
 
     public function index(Request $request): View
     {
+        $datos = $request->validate([
+            'estado' => ['nullable', Rule::in(Reserva::ESTADOS)],
+            'desde' => ['nullable', 'date'],
+            'hasta' => ['nullable', 'date'],
+        ]);
+
         return view('reservas.index', [
             'reservas' => $this->servicioReservas->listar(
-                $request->get('estado'),
+                $datos['estado'] ?? null,
                 $request->get('buscar'),
-                $request->get('desde'),
-                $request->get('hasta')
+                $datos['desde'] ?? null,
+                $datos['hasta'] ?? null
             ),
-            'estado' => $request->get('estado'),
+            'estado' => $datos['estado'] ?? null,
             'buscar' => $request->get('buscar'),
-            'desde' => $request->get('desde'),
-            'hasta' => $request->get('hasta'),
+            'desde' => $datos['desde'] ?? null,
+            'hasta' => $datos['hasta'] ?? null,
         ]);
     }
 
@@ -159,10 +165,14 @@ class ReservaController extends Controller
         return back()->with('exito', 'Check-in realizado. Huésped hospedado.');
     }
 
-    public function checkOut(Reserva $reserva): RedirectResponse
+    public function checkOut(Request $request, Reserva $reserva): RedirectResponse
     {
         try {
-            $this->servicioReservas->checkOut($reserva);
+            $this->servicioReservas->checkOut(
+                $reserva,
+                $request->input('motivo_excepcion'),
+                $request->user()
+            );
         } catch (OperacionInvalida $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -172,19 +182,16 @@ class ReservaController extends Controller
 
     private function validar(Request $request, ?Reserva $reserva = null): array
     {
-        $estadosEditables = ['pendiente', 'confirmada', 'cancelada'];
-
-        if ($reserva && in_array($reserva->estado, ['hospedado', 'finalizada'])) {
-            $estadosEditables[] = $reserva->estado;
-        }
+        $estadosEditables = $reserva?->estado === Reserva::ESTADO_CANCELADA
+            ? [Reserva::ESTADO_CANCELADA]
+            : [Reserva::ESTADO_CONFIRMADA, Reserva::ESTADO_CANCELADA];
 
         $reglas = [
-            'habitacion_id' => ['required', 'exists:habitaciones,id'],
-            'huesped_id' => ['required', 'exists:huespedes,id'],
+            'habitacion_id' => ['required', Rule::exists('habitaciones', 'id')->whereNull('deleted_at')],
+            'huesped_id' => ['required', Rule::exists('huespedes', 'id')->whereNull('deleted_at')],
             'fecha_entrada' => ['required', 'date'],
             'fecha_salida' => ['required', 'date', 'after:fecha_entrada'],
             'num_huespedes' => ['required', 'integer', 'min:1', 'max:20'],
-            'estado' => ['required', 'in:'.implode(',', $estadosEditables)],
             'notas' => ['nullable', 'string', 'max:1000'],
         ];
 
@@ -194,12 +201,16 @@ class ReservaController extends Controller
             'huesped_id.required' => 'Debe seleccionar el huésped.',
             'huesped_id.exists' => 'El huésped seleccionado no existe.',
             'fecha_entrada.required' => 'La fecha de entrada es obligatoria.',
+            'fecha_entrada.after_or_equal' => 'La fecha de entrada no puede ser anterior a hoy.',
             'fecha_salida.required' => 'La fecha de salida es obligatoria.',
             'fecha_salida.after' => 'La fecha de salida debe ser posterior a la de entrada.',
             'estado.in' => 'Estado no válido.',
         ];
 
-        if (! $reserva) {
+        if ($reserva) {
+            $reglas['estado'] = ['required', 'in:'.implode(',', $estadosEditables)];
+        } else {
+            $reglas['fecha_entrada'][] = 'after_or_equal:today';
             $reglas['anticipo_monto'] = ['required', 'numeric', 'min:0.01'];
             $reglas['anticipo_metodo'] = ['required', Rule::in(Cobro::METODOS)];
             $reglas['anticipo_fecha'] = ['required', 'date'];
@@ -210,14 +221,20 @@ class ReservaController extends Controller
             $mensajes['anticipo_fecha.required'] = 'Debe indicar la fecha del anticipo.';
         }
 
-        return $request->validate($reglas, $mensajes);
+        $datos = $request->validate($reglas, $mensajes);
+
+        if (! $reserva) {
+            $datos['estado'] = Reserva::ESTADO_CONFIRMADA;
+        }
+
+        return $datos;
     }
 
     private function validarWalkIn(Request $request): array
     {
         $datos = $request->validate([
-            'habitacion_id' => ['required', 'exists:habitaciones,id'],
-            'huesped_id' => ['required', 'exists:huespedes,id'],
+            'habitacion_id' => ['required', Rule::exists('habitaciones', 'id')->whereNull('deleted_at')],
+            'huesped_id' => ['required', Rule::exists('huespedes', 'id')->whereNull('deleted_at')],
             'fecha_salida' => ['required', 'date', 'after:today'],
             'num_huespedes' => ['required', 'integer', 'min:1', 'max:20'],
             'metodo_pago' => ['required', Rule::in(Cobro::METODOS)],

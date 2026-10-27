@@ -37,19 +37,19 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 py-5 border-b border-slate-200">
             <div>
                 <div class="stat-label mb-2">Huésped</div>
-                <div class="font-semibold text-slate-900">{{ $reserva->huesped->nombre ?? '—' }}</div>
-                <div class="text-sm text-slate-600">Doc: {{ $reserva->huesped->tipo_documento ?? '' }} {{ $reserva->huesped->documento ?? '' }}</div>
-                @if ($reserva->huesped->email)
-                    <div class="text-sm text-slate-600">{{ $reserva->huesped->email }}</div>
+                <div class="font-semibold text-slate-900">{{ $reserva->huesped?->nombre ?? '—' }}</div>
+                <div class="text-sm text-slate-600">Doc: {{ $reserva->huesped?->tipo_documento ?? '' }} {{ $reserva->huesped?->documento ?? '' }}</div>
+                @if ($reserva->huesped?->email)
+                    <div class="text-sm text-slate-600">{{ $reserva->huesped?->email }}</div>
                 @endif
-                @if ($reserva->huesped->telefono)
-                    <div class="text-sm text-slate-600">Tel: {{ $reserva->huesped->telefono }}</div>
+                @if ($reserva->huesped?->telefono)
+                    <div class="text-sm text-slate-600">Tel: {{ $reserva->huesped?->telefono }}</div>
                 @endif
             </div>
             <div>
                 <div class="stat-label mb-2">Detalle de estadía</div>
                 <div class="text-sm text-slate-700">
-                    <div><span class="text-slate-500">Habitación:</span> Nº {{ $reserva->habitacion->numero }} ({{ $reserva->habitacion->tipoHabitacion->nombre ?? $reserva->habitacion->tipo }})</div>
+                    <div><span class="text-slate-500">Habitación:</span> Nº {{ $reserva->habitacion?->numero ?? 'N/D' }} ({{ $reserva->habitacion?->tipoHabitacion?->nombre ?? $reserva->habitacion?->tipo }})</div>
                     <div><span class="text-slate-500">Entrada:</span> {{ $reserva->fecha_entrada->format('d/m/Y') }}</div>
                     <div><span class="text-slate-500">Salida:</span> {{ $reserva->fecha_salida->format('d/m/Y') }}</div>
                     <div><span class="text-slate-500">Noches:</span> {{ $reserva->noches() }}</div>

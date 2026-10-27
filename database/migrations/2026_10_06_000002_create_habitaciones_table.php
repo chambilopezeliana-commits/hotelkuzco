@@ -11,13 +11,21 @@ return new class extends Migration
         Schema::create('habitaciones', function (Blueprint $table) {
             $table->id();
             $table->string('numero')->unique();
-            $table->string('tipo')->default('Estándar');
-            $table->integer('capacidad')->default(2);
-            $table->decimal('precio', 8, 2);
+            $table->foreignId('tipo_habitacion_id')
+                ->nullable()
+                ->constrained('tipos_habitacion')
+                ->nullOnDelete();
             $table->string('estado')->default('disponible');
             $table->text('descripcion')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('estado');
         });
+
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE habitaciones ENGINE = InnoDB');
+        }
     }
 
     public function down(): void

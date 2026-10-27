@@ -8,6 +8,8 @@ use App\Repositories\TipoHabitacionRepository;
 use App\Rules\SoloLetras;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -54,6 +56,19 @@ class TipoHabitacionController extends Controller
         abort_unless($request->user()->esAdmin(), 403);
 
         $datos = $this->validar($request, $tipo_habitacion);
+
+        if (
+            $tipo_habitacion->activo
+            && array_key_exists('activo', $datos)
+            && ! $datos['activo']
+            && $this->tipos->tieneReservasActivas($tipo_habitacion->id)
+        ) {
+            return back()->withInput()->with(
+                'error',
+                'No se puede desactivar el tipo: tiene reservas activas en sus habitaciones.'
+            );
+        }
+
         $antes = $tipo_habitacion->toArray();
         $tipo_habitacion = $this->tipos->actualizar($tipo_habitacion, $datos);
 
@@ -74,13 +89,25 @@ class TipoHabitacionController extends Controller
         $antes = $tipo_habitacion->toArray();
 
         // Baja lógica: se desocupa el nombre único para permitir recrear el tipo.
-        $tipo_habitacion->update(['nombre' => 'ELIMINADO #'.$tipo_habitacion->id]);
+        $nombreEliminado = $this->nombreEliminado($tipo_habitacion);
 
-        $this->tipos->eliminar($tipo_habitacion);
+        DB::transaction(function () use ($tipo_habitacion, $nombreEliminado) {
+            $tipo_habitacion->update(['nombre' => $nombreEliminado]);
+            $this->tipos->eliminar($tipo_habitacion);
+        });
 
         Auditoria::registrar('eliminar', 'tipo_habitacion', $tipo_habitacion->id, 'Tipo de habitación eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('tipos-habitacion.index')->with('exito', 'Tipo de habitación eliminado correctamente.');
+    }
+
+    private function nombreEliminado(TipoHabitacion $tipo): string
+    {
+        do {
+            $nombre = 'ELIMINADO #'.$tipo->id.'-'.Str::upper(Str::random(6));
+        } while (TipoHabitacion::withTrashed()->where('nombre', $nombre)->exists());
+
+        return $nombre;
     }
 
     private function validar(Request $request, ?TipoHabitacion $tipo = null): array

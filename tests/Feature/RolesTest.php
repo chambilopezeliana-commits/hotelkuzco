@@ -42,6 +42,44 @@ class RolesTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_no_se_puede_degradar_al_ultimo_admin_activo(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->put("/usuarios/{$admin->id}", [
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => 'recepcionista',
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $admin->id,
+            'role' => 'administrador',
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_se_puede_degradar_un_admin_si_queda_otro_activo(): void
+    {
+        $admin = $this->admin();
+        User::factory()->create(['role' => 'administrador', 'activo' => true]);
+
+        $this->actingAs($admin)
+            ->put("/usuarios/{$admin->id}", [
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => 'recepcionista',
+            ])
+            ->assertRedirect('/usuarios');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $admin->id,
+            'role' => 'recepcionista',
+        ]);
+    }
+
     public function test_recepcionista_no_puede_crear_habitaciones(): void
     {
         $this->actingAs($this->recepcionista())
@@ -54,6 +92,29 @@ class RolesTest extends TestCase
         $this->actingAs($this->recepcionista())
             ->get('/habitaciones')
             ->assertStatus(200);
+    }
+
+    public function test_recepcionista_no_ve_cifras_financieras_en_el_panel(): void
+    {
+        $respuesta = $this->actingAs($this->recepcionista())
+            ->get('/panel')
+            ->assertOk();
+
+        $respuesta->assertViewMissing('datos.ingresosMes');
+        $respuesta->assertViewMissing('datos.cobrosHoy');
+        $respuesta->assertDontSee('Cobros de hoy');
+        $respuesta->assertDontSee('Ingresos del mes');
+    }
+
+    public function test_admin_ve_cifras_financieras_en_el_panel(): void
+    {
+        $this->actingAs($this->admin())
+            ->get('/panel')
+            ->assertOk()
+            ->assertViewHas('datos', fn (array $datos) => array_key_exists('ingresosMes', $datos)
+                && array_key_exists('cobrosHoy', $datos))
+            ->assertSee('Cobros de hoy')
+            ->assertSee('Ingresos del mes');
     }
 
     public function test_recepcionista_puede_crear_reservas(): void

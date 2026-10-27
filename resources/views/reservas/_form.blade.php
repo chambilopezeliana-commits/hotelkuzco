@@ -1,4 +1,6 @@
-@php($esEdicion = isset($reserva))
+@php
+    $esEdicion = isset($reserva);
+@endphp
 
 <div class="form-grid">
     <div>
@@ -52,16 +54,18 @@
         @error('num_huespedes') <div class="error-text">{{ $message }}</div> @enderror
     </div>
 
-    <div>
-        <label for="estado" class="label">Estado *</label>
-        <select id="estado" name="estado" class="select" required>
-            @foreach (['pendiente' => 'Pendiente', 'confirmada' => 'Confirmada', 'cancelada' => 'Cancelada'] as $valor => $etiqueta)
-                <option value="{{ $valor }}" {{ old('estado', $reserva->estado ?? 'pendiente') === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
-            @endforeach
-        </select>
-        @error('estado') <div class="error-text">{{ $message }}</div> @enderror
-        <div class="hint">Check-in y check-out se realizan desde el listado.</div>
-    </div>
+    @if ($esEdicion)
+        <div>
+            <label for="estado" class="label">Estado *</label>
+            <select id="estado" name="estado" class="select" required>
+                @foreach (($reserva->estado ?? null) === 'cancelada' ? ['cancelada' => 'Cancelada'] : ['confirmada' => 'Confirmada', 'cancelada' => 'Cancelada'] as $valor => $etiqueta)
+                    <option value="{{ $valor }}" {{ old('estado', $reserva->estado ?? 'confirmada') === $valor ? 'selected' : '' }}>{{ $etiqueta }}</option>
+                @endforeach
+            </select>
+            @error('estado') <div class="error-text">{{ $message }}</div> @enderror
+            <div class="hint">Check-in y check-out se realizan desde el listado.</div>
+        </div>
+    @endif
 </div>
 
 <div class="mt-4">

@@ -54,7 +54,7 @@
     <div class="stat-card">
         <span class="stat-label">Habitaciones libres</span>
         <span class="stat-value">{{ $datos['disponibles'] }}<span class="text-slate-300 text-lg font-semibold">/{{ $datos['totalHabitaciones'] }}</span></span>
-        <span class="stat-hint">{{ $datos['mantenimiento'] }} en mantenimiento@if (($datos['limpieza'] ?? 0) > 0) · {{ $datos['limpieza'] }} en limpieza@endif</span>
+        <span class="stat-hint">{{ $datos['mantenimiento'] }} en mantenimiento @if (($datos['limpieza'] ?? 0) > 0) · {{ $datos['limpieza'] }} en limpieza @endif</span>
     </div>
     <div class="stat-card">
         <span class="stat-label">Ocupadas</span>
@@ -66,6 +66,7 @@
         <span class="stat-value">{{ $datos['reservasActivas'] }}</span>
         <span class="stat-hint">{{ $datos['reservasHoy'] }} entradas hoy · {{ $datos['salidasHoy'] }} salidas</span>
     </div>
+    @if (auth()->user()->esAdmin())
     <div class="stat-card">
         <span class="stat-label">Cobros de hoy</span>
         <span class="stat-value">{{ bs($datos['cobrosHoy']) }}</span>
@@ -76,6 +77,7 @@
         <span class="stat-value">{{ bs($datos['ingresosMes']) }}</span>
         <span class="stat-hint">Pagos netos del mes en curso</span>
     </div>
+    @endif
     <div class="stat-card">
         <span class="stat-label">Huéspedes registrados</span>
         <span class="stat-value">{{ $datos['totalHuespedes'] }}</span>
@@ -141,9 +143,10 @@
                         <td>{{ $reserva->fecha_salida->format('d/m/Y') }}</td>
                         <td>
                             @php
-                                $clases = ['pendiente' => 'badge-warning', 'confirmada' => 'badge-success', 'hospedado' => 'badge-info', 'finalizada' => 'badge-neutral', 'cancelada' => 'badge-danger'];
+                                $clases = ['confirmada' => 'badge-success', 'en_estadia' => 'badge-info', 'finalizada' => 'badge-neutral', 'cancelada' => 'badge-danger'];
+                                $etiquetas = ['confirmada' => 'Confirmada', 'en_estadia' => 'En estadía', 'finalizada' => 'Finalizada', 'cancelada' => 'Cancelada'];
                             @endphp
-                            <span class="badge {{ $clases[$reserva->estado] ?? 'badge-neutral' }}">{{ ucfirst($reserva->estado) }}</span>
+                            <span class="badge {{ $clases[$reserva->estado] ?? 'badge-neutral' }}">{{ $etiquetas[$reserva->estado] ?? ucfirst($reserva->estado) }}</span>
                         </td>
                         <td class="font-semibold">{{ bs($reserva->total) }}</td>
                         <td class="text-right">

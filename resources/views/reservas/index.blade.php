@@ -25,8 +25,11 @@
                 <label class="label" for="estado">Estado</label>
                 <select id="estado" name="estado" class="filter-input">
                     <option value="">Todos</option>
+                    @php
+                        $etiquetasEstado = ['confirmada' => 'Confirmada', 'en_estadia' => 'En estadía', 'finalizada' => 'Finalizada', 'cancelada' => 'Cancelada'];
+                    @endphp
                     @foreach (\App\Models\Reserva::ESTADOS as $opcion)
-                        <option value="{{ $opcion }}" {{ $estado === $opcion ? 'selected' : '' }}>{{ ucfirst($opcion) }}</option>
+                        <option value="{{ $opcion }}" {{ $estado === $opcion ? 'selected' : '' }}>{{ $etiquetasEstado[$opcion] ?? ucfirst($opcion) }}</option>
                     @endforeach
                 </select>
             </div>
@@ -68,47 +71,53 @@
                 </thead>
                 <tbody>
                     @php
-                        $clases = ['pendiente' => 'badge-warning', 'confirmada' => 'badge-success', 'hospedado' => 'badge-info', 'finalizada' => 'badge-neutral', 'cancelada' => 'badge-danger'];
+                        $clases = ['confirmada' => 'badge-success', 'en_estadia' => 'badge-info', 'finalizada' => 'badge-neutral', 'cancelada' => 'badge-danger'];
                     @endphp
                     @foreach ($reservas as $reserva)
                     <tr>
                         <td>
-                            <div class="font-semibold text-slate-900">{{ $reserva->huesped->nombre ?? '—' }}</div>
-                            <div class="text-xs text-slate-500">{{ $reserva->huesped->documento ?? '' }}</div>
+                            <div class="font-semibold text-slate-900">{{ $reserva->huesped?->nombre ?? '—' }}</div>
+                            <div class="text-xs text-slate-500">{{ $reserva->huesped?->documento ?? '' }}</div>
                         </td>
                         <td>
-                            <span class="font-medium">Nº {{ $reserva->habitacion->numero }}</span>
-                            <div class="text-xs text-slate-500">{{ $reserva->habitacion->tipo ?? '—' }}</div>
+                            <span class="font-medium">Nº {{ $reserva->habitacion?->numero ?? 'N/D' }}</span>
+                            <div class="text-xs text-slate-500">{{ $reserva->habitacion?->tipo ?? '—' }}</div>
                         </td>
                         <td>
                             <div class="text-sm">{{ $reserva->fecha_entrada->format('d/m/Y') }} → {{ $reserva->fecha_salida->format('d/m/Y') }}</div>
                         </td>
                         <td>{{ $reserva->noches() }}</td>
                         <td class="font-semibold">{{ bs($reserva->total) }}</td>
-                        <td><span class="badge {{ $clases[$reserva->estado] ?? 'badge-neutral' }}">{{ ucfirst($reserva->estado) }}</span></td>
+                        <td><span class="badge {{ $clases[$reserva->estado] ?? 'badge-neutral' }}">{{ $etiquetasEstado[$reserva->estado] ?? ucfirst($reserva->estado) }}</span></td>
                         <td>
                             <div class="acciones justify-end">
-                                @if (in_array($reserva->estado, ['pendiente', 'confirmada']))
-                                    <form method="POST" action="{{ route('reservas.checkin', $reserva) }}" onsubmit="return confirm('¿Realizar check-in? Se requiere el pago total de la estadía.')">
+                                @if ($reserva->estado === 'confirmada')
+                                    <form method="POST" action="{{ route('reservas.checkin', $reserva) }}" onsubmit="return confirm('¿Realizar check-in? El saldo se valida al momento del check-out.')">
                                         @csrf
                                         <button class="btn btn-sm btn-success" type="submit">Check-in</button>
                                     </form>
                                 @endif
-                                @if ($reserva->estado === 'hospedado')
-                                    <form method="POST" action="{{ route('reservas.checkout', $reserva) }}" onsubmit="return confirm('¿Realizar check-out? La habitación pasará a limpieza.')">
+                                @if ($reserva->estado === 'en_estadia')
+                                    <form method="POST" action="{{ route('reservas.checkout', $reserva) }}" onsubmit="return confirm('¿Realizar check-out? La habitación pasará a limpieza y la cuenta debe estar saldada.')">
                                         @csrf
+                                        @if (auth()->user()->esAdmin())
+                                            <input type="text" name="motivo_excepcion" class="filter-input w-44 text-xs" placeholder="Motivo excepción (si hay saldo)" title="Solo administrador: motivo para check-out con saldo pendiente">
+                                        @endif
                                         <button class="btn btn-sm btn-success" type="submit">Check-out</button>
                                     </form>
                                 @endif
                                 <a href="{{ route('cobros.index', $reserva) }}" class="btn btn-sm btn-primary">Cobros</a>
-                                @if (in_array($reserva->estado, ['pendiente', 'confirmada']))
+                                @if ($reserva->estado === 'confirmada')
                                     <a href="{{ route('reservas.edit', $reserva) }}" class="btn btn-sm btn-secondary">Editar</a>
                                     <form method="POST" action="{{ route('reservas.cancelar', $reserva) }}" onsubmit="return confirm('¿Cancelar esta reserva? Se liberará la habitación.')">
                                         @csrf
                                         <button class="btn btn-sm btn-secondary" type="submit">Cancelar</button>
                                     </form>
                                 @endif
-                                @if (in_array($reserva->estado, ['pendiente', 'confirmada', 'finalizada', 'cancelada']))
+                                @if ($reserva->estado === 'cancelada')
+                                    <a href="{{ route('reservas.edit', $reserva) }}" class="btn btn-sm btn-secondary">Editar</a>
+                                @endif
+                                @if (in_array($reserva->estado, ['confirmada', 'finalizada', 'cancelada']))
                                     <form method="POST" action="{{ route('reservas.destroy', $reserva) }}" onsubmit="return confirm('¿Eliminar definitivamente esta reserva?')">
                                         @csrf
                                         @method('DELETE')

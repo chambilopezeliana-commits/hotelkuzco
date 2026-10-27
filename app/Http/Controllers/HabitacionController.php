@@ -8,6 +8,7 @@ use App\Repositories\HabitacionRepository;
 use App\Repositories\TipoHabitacionRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -77,17 +78,20 @@ class HabitacionController extends Controller
         abort_unless($request->user()->esAdmin(), 403);
 
         // Validación previa: no eliminar habitaciones con relaciones activas (reservas en curso).
-        if ($this->habitaciones->tieneReservasActivas($habitacion->id)) {
-            return back()->with('error', 'No se puede eliminar: la habitación tiene reservas activas.');
+        if ($this->habitaciones->tieneReservas($habitacion->id)) {
+            return back()->with('error', 'No se puede eliminar: la habitación tiene reservas registradas en el historial.');
         }
 
         $antes = $habitacion->toArray();
 
         // Baja lógica: se desocupa el número único (prefijo 0, que no colisiona
         // con la numeración real de pisos 101–506) para permitir reutilizarlo.
-        $habitacion->update(['numero' => '0'.$habitacion->id]);
+        $numeroEliminado = $this->numeroEliminado($habitacion);
 
-        $this->habitaciones->eliminar($habitacion);
+        DB::transaction(function () use ($habitacion, $numeroEliminado) {
+            $habitacion->update(['numero' => $numeroEliminado]);
+            $this->habitaciones->eliminar($habitacion);
+        });
 
         Auditoria::registrar('eliminar', 'habitacion', $habitacion->id, 'Habitación eliminada (baja lógica)', $antes, []);
 
@@ -108,6 +112,15 @@ class HabitacionController extends Controller
         return back()->with('exito', 'Habitación Nº '.$habitacion->numero.' limpia y disponible.');
     }
 
+    private function numeroEliminado(Habitacion $habitacion): string
+    {
+        do {
+            $numero = '9'.$habitacion->id.str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while (Habitacion::withTrashed()->where('numero', $numero)->exists());
+
+        return $numero;
+    }
+
     private function validar(Request $request, ?Habitacion $habitacion = null): array
     {
         $request->merge(['numero' => trim((string) $request->input('numero', ''))]);
@@ -116,7 +129,7 @@ class HabitacionController extends Controller
             'numero' => ['required', 'string', 'max:20', 'regex:/^[0-9]+$/', Rule::unique('habitaciones', 'numero')
                 ->whereNull('deleted_at')
                 ->ignore($habitacion?->id)],
-            'tipo_habitacion_id' => ['required', 'exists:tipos_habitacion,id'],
+            'tipo_habitacion_id' => ['required', Rule::exists('tipos_habitacion', 'id')->whereNull('deleted_at')->where('activo', true)],
             'estado' => ['required', 'in:'.implode(',', Habitacion::ESTADOS)],
             'descripcion' => ['nullable', 'string', 'max:500'],
         ];

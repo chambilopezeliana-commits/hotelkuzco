@@ -29,20 +29,16 @@ class DashboardController extends Controller
                 ->orderBy('numero')
                 ->get(),
             'reservasHoy' => Reserva::whereDate('fecha_entrada', $hoy)
-                ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
+                ->whereIn('estado', Reserva::ESTADOS_ACTIVOS)
                 ->count(),
             'salidasHoy' => Reserva::whereDate('fecha_salida', $hoy)
-                ->where('estado', 'hospedado')
+                ->where('estado', Reserva::ESTADO_EN_ESTADIA)
                 ->count(),
-            'huespedesActivos' => Reserva::where('estado', 'hospedado')->count(),
-            'reservasActivas' => Reserva::whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])->count(),
+            'huespedesActivos' => Reserva::where('estado', Reserva::ESTADO_EN_ESTADIA)->count(),
+            'reservasActivas' => Reserva::whereIn('estado', Reserva::ESTADOS_ACTIVOS)->count(),
             'totalHuespedes' => Huesped::count(),
-            'ingresosMes' => (float) Cobro::whereMonth('fecha', $hoy->month)
-                ->whereYear('fecha', $hoy->year)
-                ->sum('monto'),
-            'cobrosHoy' => (float) Cobro::whereDate('fecha', $hoy)->sum('monto'),
             'reservasSinAnticipo' => Reserva::with(['huesped', 'habitacion'])
-                ->whereIn('estado', ['pendiente', 'confirmada'])
+                ->where('estado', Reserva::ESTADO_CONFIRMADA)
                 ->withSum('cobros', 'monto')
                 ->orderBy('fecha_entrada')
                 ->get()
@@ -51,6 +47,10 @@ class DashboardController extends Controller
         ];
 
         if (request()->user()->esAdmin()) {
+            $datos['ingresosMes'] = (float) Cobro::whereMonth('fecha', $hoy->month)
+                ->whereYear('fecha', $hoy->year)
+                ->sum('monto');
+            $datos['cobrosHoy'] = (float) Cobro::whereDate('fecha', $hoy)->sum('monto');
             $datos['usuarios'] = User::count();
             $datos['usuariosActivos'] = User::where('activo', true)->count();
         }

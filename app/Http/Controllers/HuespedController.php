@@ -8,6 +8,8 @@ use App\Repositories\HuespedRepository;
 use App\Rules\SoloLetras;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -55,24 +57,35 @@ class HuespedController extends Controller
     public function destroy(Huesped $huesped): RedirectResponse
     {
         // Validación previa: no eliminar huéspedes con relaciones activas (reservas en curso).
-        $activas = $huesped->reservas()
-            ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
-            ->count();
-
-        if ($activas > 0) {
-            return back()->with('error', 'No se puede eliminar: el huésped tiene reservas activas.');
+        if ($this->huespedes->tieneReservas($huesped->id)) {
+            return back()->with('error', 'No se puede eliminar: el huésped tiene reservas registradas en el historial.');
         }
 
         $antes = $huesped->toArray();
 
         // Baja lógica: se desocupa el documento único (tipo_documento + documento)
         // para permitir registrar un nuevo huésped con ese documento.
-        $huesped->update(['documento' => 'ELIM-'.$huesped->id]);
+        $documentoEliminado = $this->documentoEliminado($huesped);
 
-        $this->huespedes->eliminar($huesped);
+        DB::transaction(function () use ($huesped, $documentoEliminado) {
+            $huesped->update(['documento' => $documentoEliminado]);
+            $this->huespedes->eliminar($huesped);
+        });
         Auditoria::registrar('eliminar', 'huesped', $huesped->id, 'Huésped eliminado (baja lógica)', $antes, []);
 
         return redirect()->route('huespedes.index')->with('exito', 'Huésped eliminado correctamente.');
+    }
+
+    private function documentoEliminado(Huesped $huesped): string
+    {
+        do {
+            $documento = 'ELIM-'.$huesped->id.'-'.Str::upper(Str::random(6));
+        } while (Huesped::withTrashed()
+            ->where('tipo_documento', $huesped->tipo_documento)
+            ->where('documento', $documento)
+            ->exists());
+
+        return $documento;
     }
 
     private function validar(Request $request, ?Huesped $huesped = null): array

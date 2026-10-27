@@ -1,4 +1,6 @@
-@php($esEdicion = isset($tipo))
+@php
+    $esEdicion = isset($tipo);
+@endphp
 
 <div class="form-grid">
     <div>

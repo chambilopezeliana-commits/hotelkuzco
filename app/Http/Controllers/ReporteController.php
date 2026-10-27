@@ -10,12 +10,17 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
 class ReporteController extends Controller
 {
+    private const ESTADOS_CON_INGRESO = [
+        Reserva::ESTADO_CONFIRMADA,
+        Reserva::ESTADO_EN_ESTADIA,
+        Reserva::ESTADO_FINALIZADA,
+    ];
+
     public function index(Request $request): View
     {
         return view('reportes.index', $this->datos($request));
@@ -97,7 +102,7 @@ class ReporteController extends Controller
             ->map->count();
 
         $totalReservasPeriodo = $reservasPeriodo->count();
-        $canceladas = (int) ($reservasPorEstado['cancelada'] ?? 0);
+        $canceladas = (int) ($reservasPorEstado[Reserva::ESTADO_CANCELADA] ?? 0);
         $tasaCancelacion = $totalReservasPeriodo > 0
             ? round($canceladas / $totalReservasPeriodo * 100, 2)
             : 0.0;
@@ -137,7 +142,7 @@ class ReporteController extends Controller
         $inicioDespues = $desde->toDateString();
         $finAntes = $hasta->toDateString();
 
-        $reservas = Reserva::whereIn('estado', ['confirmada', 'hospedado', 'finalizada'])
+        $reservas = Reserva::whereIn('estado', self::ESTADOS_CON_INGRESO)
             ->whereDate('fecha_entrada', '<=', $finAntes)
             ->whereDate('fecha_salida', '>=', $inicioDespues)
             ->get(['fecha_entrada', 'fecha_salida']);
@@ -163,7 +168,7 @@ class ReporteController extends Controller
         $tipos = TipoHabitacion::orderBy('nombre')->get();
 
         return $tipos->map(function ($tipo) use ($desde, $hasta) {
-            $reservas = Reserva::whereIn('estado', ['confirmada', 'hospedado', 'finalizada'])
+            $reservas = Reserva::whereIn('estado', self::ESTADOS_CON_INGRESO)
                 ->whereHas('habitacion', fn ($q) => $q->where('tipo_habitacion_id', $tipo->id))
                 ->whereDate('fecha_entrada', '<=', $hasta->toDateString())
                 ->whereDate('fecha_salida', '>=', $desde->toDateString())
@@ -227,9 +232,9 @@ class ReporteController extends Controller
             'metodo_label' => Cobro::etiqueta($cobro->metodo),
             'monto' => (float) $cobro->monto,
             'reserva_id' => $cobro->reserva_id,
-            'huesped' => $cobro->reserva->huesped->nombre ?? '—',
-            'documento' => $cobro->reserva->huesped->documento ?? '',
-            'habitacion' => $cobro->reserva->habitacion->numero ?? '—',
+            'huesped' => $cobro->reserva?->huesped->nombre ?? '—',
+            'documento' => $cobro->reserva?->huesped->documento ?? '',
+            'habitacion' => $cobro->reserva?->habitacion->numero ?? '—',
             'registrado_por' => $cobro->usuario->name ?? '—',
             'anulado' => (bool) $cobro->anulado,
         ]);
@@ -251,7 +256,7 @@ class ReporteController extends Controller
      */
     private function serieDiaria(Carbon $desde, Carbon $hasta, int $totalHabitaciones): array
     {
-        $reservas = Reserva::whereIn('estado', ['confirmada', 'hospedado', 'finalizada'])
+        $reservas = Reserva::whereIn('estado', self::ESTADOS_CON_INGRESO)
             ->whereDate('fecha_entrada', '<=', $hasta->toDateString())
             ->whereDate('fecha_salida', '>=', $desde->toDateString())
             ->get(['fecha_entrada', 'fecha_salida']);
@@ -292,12 +297,17 @@ class ReporteController extends Controller
 
     private function topHabitaciones(Carbon $desde, Carbon $hasta)
     {
-        return DB::table('cobros')
+        return Cobro::query()
             ->join('reservas', 'reservas.id', '=', 'cobros.reserva_id')
             ->join('habitaciones', 'habitaciones.id', '=', 'reservas.habitacion_id')
-            ->whereNotNull('cobros.reserva_id')
+            ->whereNull('reservas.deleted_at')
+            ->whereNull('habitaciones.deleted_at')
             ->whereBetween('cobros.fecha', [$desde->toDateTimeString(), $hasta->toDateTimeString()])
-            ->selectRaw('habitaciones.numero as numero, SUM(cobros.monto) as ingresos, COUNT(*) as pagos')
+            ->selectRaw(
+                'habitaciones.numero as numero, SUM(cobros.monto) as ingresos, '
+                .'SUM(CASE WHEN cobros.tipo = ? AND NOT cobros.anulado THEN 1 ELSE 0 END) as pagos',
+                [Cobro::TIPO_PAGO]
+            )
             ->groupBy('habitaciones.numero')
             ->orderByDesc('ingresos')
             ->limit(10)

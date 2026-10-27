@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Huesped;
+use App\Models\Reserva;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class HuespedRepository
@@ -27,11 +28,6 @@ class HuespedRepository
         return Huesped::orderBy('nombre')->get();
     }
 
-    public function encontrar(int $id): Huesped
-    {
-        return Huesped::findOrFail($id);
-    }
-
     public function porDocumento(string $tipoDocumento, string $documento): ?Huesped
     {
         return Huesped::where('tipo_documento', $tipoDocumento)
@@ -54,5 +50,12 @@ class HuespedRepository
     public function eliminar(Huesped $huesped): void
     {
         $huesped->delete();
+    }
+
+    public function tieneReservas(int $huespedId): bool
+    {
+        return Reserva::withTrashed()
+            ->where('huesped_id', $huespedId)
+            ->exists();
     }
 }

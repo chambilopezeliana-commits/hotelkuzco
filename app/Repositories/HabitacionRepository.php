@@ -30,11 +30,6 @@ class HabitacionRepository
         return Habitacion::with('tipoHabitacion')->orderBy('numero')->get();
     }
 
-    public function encontrar(int $id): Habitacion
-    {
-        return Habitacion::with('tipoHabitacion')->findOrFail($id);
-    }
-
     public function bloquear(int $id): Habitacion
     {
         return Habitacion::with('tipoHabitacion')->whereKey($id)->lockForUpdate()->firstOrFail();
@@ -57,11 +52,10 @@ class HabitacionRepository
         $habitacion->delete();
     }
 
-    public function tieneReservasActivas(int $habitacionId): bool
+    public function tieneReservas(int $habitacionId): bool
     {
-        return Reserva::query()
+        return Reserva::withTrashed()
             ->where('habitacion_id', $habitacionId)
-            ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
             ->exists();
     }
 
@@ -80,16 +74,16 @@ class HabitacionRepository
         return Habitacion::query()
             ->with('tipoHabitacion')
             ->whereNotIn('estado', Habitacion::ESTADOS_NO_DISPONIBLES)
+            ->whereHas('tipoHabitacion', fn (Builder $q) => $q->where('activo', true))
             ->when($tipoId, fn (Builder $q) => $q->where('tipo_habitacion_id', $tipoId))
             ->when($capacidadMin, fn (Builder $q) => $q->whereHas(
                 'tipoHabitacion',
                 fn (Builder $t) => $t->where('capacidad', '>=', $capacidadMin)
             ))
-            ->whereDoesntHave('reservas', function (Builder $q) use ($entrada, $salida) {
-                $q->where('estado', '!=', 'cancelada')
-                    ->where('fecha_entrada', '<', $salida)
-                    ->where('fecha_salida', '>', $entrada);
-            })
+            ->whereDoesntHave(
+                'nochesOcupadas',
+                fn (Builder $q) => $q->where('noche', '>=', $entrada)->where('noche', '<', $salida)
+            )
             ->orderBy('numero')
             ->get();
     }

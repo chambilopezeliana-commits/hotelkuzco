@@ -1,4 +1,6 @@
-@php($esEdicion = isset($huesped))
+@php
+    $esEdicion = isset($huesped);
+@endphp
 
 <div class="form-grid">
     <div class="md:col-span-2">

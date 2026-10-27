@@ -66,7 +66,20 @@ class CorreccionesTest extends TestCase
         ]);
     }
 
-    public function test_no_se_puede_eliminar_un_cobro_anulado(): void
+    public function test_los_cobros_no_se_pueden_eliminar(): void
+    {
+        $cobro = $this->crearCobro(50);
+
+        // Criterio transversal del documento: los pagos no se eliminan,
+        // se anulan mediante contraasiento. La ruta de borrado no existe.
+        $this->actingAs($this->admin)
+            ->delete("/cobros/{$cobro->id}")
+            ->assertStatus(404);
+
+        $this->assertDatabaseHas('cobros', ['id' => $cobro->id, 'anulado' => false]);
+    }
+
+    public function test_anular_cobro_conserva_el_historial(): void
     {
         $cobro = $this->crearCobro(50);
 
@@ -74,27 +87,13 @@ class CorreccionesTest extends TestCase
             ->post("/cobros/{$cobro->id}/anular", ['motivo' => 'Error de caja'])
             ->assertRedirect();
 
-        $this->actingAs($this->admin)
-            ->delete("/cobros/{$cobro->id}")
-            ->assertSessionHas('error');
-
         $this->assertDatabaseHas('cobros', ['id' => $cobro->id, 'anulado' => true]);
-    }
+        $this->assertDatabaseHas('cobros', ['cobro_origen_id' => $cobro->id, 'monto' => -50]);
 
-    public function test_no_se_puede_eliminar_un_contraasiento(): void
-    {
-        $cobro = $this->crearCobro(50);
-
+        // No se puede anular dos veces.
         $this->actingAs($this->admin)
-            ->post("/cobros/{$cobro->id}/anular", ['motivo' => 'Error de caja']);
-
-        $contraasiento = Cobro::where('tipo', Cobro::TIPO_CONTRAASIENTO)->firstOrFail();
-
-        $this->actingAs($this->admin)
-            ->delete("/cobros/{$contraasiento->id}")
+            ->post("/cobros/{$cobro->id}/anular", ['motivo' => 'Reintento'])
             ->assertSessionHas('error');
-
-        $this->assertDatabaseHas('cobros', ['id' => $contraasiento->id]);
     }
 
     public function test_usuario_desactivado_pierde_la_sesion(): void
@@ -176,5 +175,51 @@ class CorreccionesTest extends TestCase
             ->get('/panel')
             ->assertOk()
             ->assertSee('Alerta de limpieza');
+    }
+
+    public function test_filtros_de_reservas_rechazan_fechas_invalidas(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/reservas?desde=no-es-fecha')
+            ->assertSessionHasErrors('desde');
+    }
+
+    public function test_auditoria_rechaza_fechas_invalidas(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/auditorias?hasta=no-es-fecha')
+            ->assertSessionHasErrors('hasta');
+    }
+
+    public function test_disponibilidad_usa_el_dia_siguiente_si_solo_hay_entrada(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/disponibilidad?entrada=2027-05-10')
+            ->assertOk()
+            ->assertSee('11/05/2027');
+    }
+
+    public function test_catalogo_marca_tipo_sin_habitaciones_disponibles(): void
+    {
+        TipoHabitacion::create([
+            'nombre' => 'Tipo Limpieza Test',
+            'tarifa' => 80,
+            'capacidad' => 2,
+            'activo' => true,
+        ])->habitaciones()->create([
+            'numero' => '999',
+            'estado' => 'limpieza',
+        ]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Tipo Limpieza Test')
+            ->assertSee('No disponible');
+    }
+
+    public function test_zona_horaria_por_defecto_es_la_paz(): void
+    {
+        $this->assertSame('America/La_Paz', config('app.timezone'));
+        $this->assertSame('America/La_Paz', now()->getTimezone()->getName());
     }
 }

@@ -20,23 +20,16 @@ class CobroRepository
             ->get();
     }
 
-    public function porClaveIdempotencia(string $clave): ?Cobro
+    public function porClaveIdempotencia(string $clave, ?int $reservaId = null): ?Cobro
     {
-        return Cobro::where('clave_idempotencia', $clave)->first();
+        return Cobro::query()
+            ->where('clave_idempotencia', $clave)
+            ->when($reservaId, fn ($query) => $query->where('reserva_id', $reservaId))
+            ->first();
     }
 
     public function crear(array $datos): Cobro
     {
         return Cobro::create($datos);
-    }
-
-    public function eliminar(Cobro $cobro): void
-    {
-        $cobro->delete();
-    }
-
-    public function contar(): int
-    {
-        return Cobro::count();
     }
 }

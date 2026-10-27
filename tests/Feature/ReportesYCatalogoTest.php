@@ -64,6 +64,26 @@ class ReportesYCatalogoTest extends TestCase
             ->assertSee('Disponibilidad de habitaciones');
     }
 
+    public function test_no_se_puede_desactivar_un_tipo_con_reservas_activas(): void
+    {
+        $tipo = $this->habitacion->tipoHabitacion;
+        $this->reserva();
+
+        $this->actingAs($this->admin)
+            ->put("/tipos-habitacion/{$tipo->id}", [
+                'nombre' => $tipo->nombre,
+                'tarifa' => $tipo->tarifa,
+                'capacidad' => $tipo->capacidad,
+                'activo' => 0,
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('tipos_habitacion', [
+            'id' => $tipo->id,
+            'activo' => true,
+        ]);
+    }
+
     public function test_admin_ve_reporte_con_indicadores(): void
     {
         $this->actingAs($this->admin)
@@ -125,6 +145,29 @@ class ReportesYCatalogoTest extends TestCase
             ->assertSee('Total QR')
             ->assertSee('Total transferencia bancaria')
             ->assertSee('Transferencia bancaria');
+    }
+
+    public function test_el_reporte_soporta_cobros_de_reservas_dadas_de_baja(): void
+    {
+        $reserva = $this->reserva();
+
+        Cobro::create([
+            'reserva_id' => $reserva->id,
+            'user_id' => $this->admin->id,
+            'monto' => 100,
+            'metodo' => 'qr',
+            'concepto' => 'Estadia',
+            'tipo' => Cobro::TIPO_PAGO,
+            'fecha' => now()->toDateString(),
+            'clave_idempotencia' => (string) Str::uuid(),
+        ]);
+
+        $reserva->delete();
+
+        $this->actingAs($this->admin)
+            ->get('/reportes')
+            ->assertStatus(200)
+            ->assertSee('Registros por QR y transferencia bancaria');
     }
 
     public function test_admin_descarga_reporte_pdf(): void

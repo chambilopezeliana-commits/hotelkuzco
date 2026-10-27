@@ -55,6 +55,20 @@ class ValidacionNombresTest extends TestCase
         $this->assertDatabaseHas('huespedes', ['nombre' => 'María José Núñez']);
     }
 
+    public function test_huesped_con_apostrofe_y_guion_es_aceptado(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/huespedes', [
+                'nombre' => "Anne-Marie O'Connor",
+                'tipo_documento' => 'DNI',
+                'documento' => 'DNI-4',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/huespedes');
+
+        $this->assertDatabaseHas('huespedes', ['nombre' => "Anne-Marie O'Connor"]);
+    }
+
     public function test_usuario_con_numeros_en_nombre_es_rechazado(): void
     {
         $this->actingAs($this->admin)

@@ -44,7 +44,6 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     Route::get('/reservas/{reserva}/cobros', [CobroController::class, 'index'])->name('cobros.index');
     Route::post('/reservas/{reserva}/cobros', [CobroController::class, 'store'])->name('cobros.store');
-    Route::delete('/cobros/{cobro}', [CobroController::class, 'destroy'])->name('cobros.destroy');
     Route::post('/cobros/{cobro}/anular', [CobroController::class, 'anular'])->name('cobros.anular');
 
     Route::resource('habitaciones', HabitacionController::class)->except('show')->parameters(['habitaciones' => 'habitacion']);

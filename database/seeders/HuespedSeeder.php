@@ -19,7 +19,10 @@ class HuespedSeeder extends Seeder
         ];
 
         foreach ($huespedes as $huesped) {
-            Huesped::updateOrCreate(['documento' => $huesped['documento']], $huesped);
+            Huesped::updateOrCreate([
+                'tipo_documento' => $huesped['tipo_documento'],
+                'documento' => $huesped['documento'],
+            ], $huesped);
         }
     }
 }

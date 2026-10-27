@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Repositories\HabitacionRepository;
 use App\Repositories\TipoHabitacionRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -20,12 +22,12 @@ class DisponibilidadController extends Controller
         $datos = $request->validate([
             'entrada' => ['nullable', 'date'],
             'salida' => ['nullable', 'date'],
-            'tipo_habitacion_id' => ['nullable', 'integer', 'exists:tipos_habitacion,id'],
+            'tipo_habitacion_id' => ['nullable', 'integer', Rule::exists('tipos_habitacion', 'id')->whereNull('deleted_at')->where('activo', true)],
             'capacidad' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
 
         $entrada = $datos['entrada'] ?? now()->toDateString();
-        $salida = $datos['salida'] ?? now()->addDay()->toDateString();
+        $salida = $datos['salida'] ?? Carbon::parse($entrada)->addDay()->toDateString();
 
         if (strtotime($salida) <= strtotime($entrada)) {
             throw ValidationException::withMessages([

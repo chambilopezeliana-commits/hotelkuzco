@@ -32,6 +32,7 @@ class CobroController extends Controller
             'metodo' => ['required', Rule::in(Cobro::METODOS)],
             'concepto' => ['required', 'string', 'max:100'],
             'fecha' => ['required', 'date'],
+            'clave_idempotencia' => ['nullable', 'string', 'max:80'],
         ], [
             'monto.required' => 'El monto es obligatorio.',
             'monto.min' => 'El monto debe ser mayor a 0.',
@@ -78,21 +79,5 @@ class CobroController extends Controller
             'cobrado' => $this->servicioCobros->totalCobrado($reserva->id),
             'saldo' => $this->servicioCobros->saldoPendiente($reserva),
         ]);
-    }
-
-    public function destroy(Request $request, int $cobroId): RedirectResponse
-    {
-        abort_unless($request->user()->esAdmin(), 403);
-
-        $cobro = Cobro::with('reserva')->findOrFail($cobroId);
-        $reserva = $cobro->reserva;
-
-        try {
-            $this->servicioCobros->eliminar($cobro);
-        } catch (OperacionInvalida $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('cobros.index', $reserva)->with('exito', 'Cobro eliminado correctamente.');
     }
 }

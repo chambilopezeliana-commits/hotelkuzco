@@ -16,11 +16,6 @@ class UsuarioRepository
             ->withQueryString();
     }
 
-    public function encontrar(int $id): User
-    {
-        return User::findOrFail($id);
-    }
-
     public function crear(array $datos): User
     {
         return User::create($datos);

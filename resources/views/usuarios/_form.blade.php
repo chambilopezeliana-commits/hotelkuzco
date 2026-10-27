@@ -1,4 +1,6 @@
-@php($esEdicion = isset($usuario))
+@php
+    $esEdicion = isset($usuario);
+@endphp
 
 <div class="form-grid">
     <div>

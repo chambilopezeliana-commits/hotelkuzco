@@ -24,7 +24,7 @@ class CatalogoController extends Controller
                 'capacidad' => (int) $tipo->capacidad,
                 'descripcion' => $tipo->descripcion,
                 'imagen' => $this->imagen($tipo->nombre),
-                'disponibles' => $tipo->habitaciones->where('estado', '!=', 'ocupada')->count(),
+                'disponibles' => $tipo->habitaciones->where('estado', 'disponible')->count(),
                 'total' => $tipo->habitaciones->count(),
                 'numeros' => $tipo->habitaciones->pluck('numero')->all(),
             ]);

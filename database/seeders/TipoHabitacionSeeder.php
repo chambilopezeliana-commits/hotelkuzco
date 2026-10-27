@@ -18,10 +18,13 @@ class TipoHabitacionSeeder extends Seeder
         ];
 
         foreach ($tipos as $tipo) {
-            TipoHabitacion::updateOrCreate(
-                ['nombre' => $tipo['nombre']],
-                $tipo + ['activo' => true],
-            );
+            $registro = TipoHabitacion::firstOrNew(['nombre' => $tipo['nombre']]);
+
+            if (! $registro->exists) {
+                $registro->activo = true;
+            }
+
+            $registro->fill($tipo)->save();
         }
     }
 }

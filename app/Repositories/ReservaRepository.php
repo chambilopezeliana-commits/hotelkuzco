@@ -36,7 +36,7 @@ class ReservaRepository
     {
         return Reserva::query()
             ->where('habitacion_id', $habitacionId)
-            ->where('estado', '!=', 'cancelada')
+            ->whereNotIn('estado', [Reserva::ESTADO_CANCELADA, Reserva::ESTADO_FINALIZADA])
             ->when($ignorarId, fn ($query) => $query->where('id', '!=', $ignorarId))
             ->where('fecha_entrada', '<', $salida)
             ->where('fecha_salida', '>', $entrada);
@@ -62,7 +62,7 @@ class ReservaRepository
     public function proximas(int $limite = 5)
     {
         return Reserva::with(['habitacion.tipoHabitacion', 'huesped'])
-            ->whereIn('estado', ['pendiente', 'confirmada', 'hospedado'])
+            ->whereIn('estado', Reserva::ESTADOS_ACTIVOS)
             ->whereDate('fecha_salida', '>=', now()->toDateString())
             ->orderBy('fecha_entrada')
             ->limit($limite)

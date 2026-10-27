@@ -25,17 +25,18 @@ class HabitacionSeeder extends Seeder
 
             for ($i = 0; $i < $datos['cantidad']; $i++) {
                 $numero = (string) ($datos['desde'] + $i);
+                $habitacion = Habitacion::firstOrNew(['numero' => $numero]);
 
-                Habitacion::updateOrCreate(['numero' => $numero], [
-                    'numero' => $numero,
+                if (! $habitacion->exists) {
+                    // Deja una suite en mantenimiento como ejemplo, solo al crear.
+                    $habitacion->estado = $numero === '503' ? 'mantenimiento' : 'disponible';
+                }
+
+                $habitacion->fill([
                     'tipo_habitacion_id' => $tipoId,
-                    'estado' => 'disponible',
                     'descripcion' => $datos['descripcion'],
-                ]);
+                ])->save();
             }
         }
-
-        // Deja una suite en mantenimiento como ejemplo.
-        Habitacion::where('numero', '503')->update(['estado' => 'mantenimiento']);
     }
 }

@@ -12,6 +12,11 @@ class AuditoriaController extends Controller
     {
         abort_unless($request->user()->esAdmin(), 403);
 
+        $datos = $request->validate([
+            'desde' => ['nullable', 'date'],
+            'hasta' => ['nullable', 'date'],
+        ]);
+
         $query = Auditoria::query()->with('usuario')->orderByDesc('created_at');
 
         if ($request->filled('entidad')) {
@@ -22,20 +27,20 @@ class AuditoriaController extends Controller
             $query->where('accion', $request->get('accion'));
         }
 
-        if ($request->filled('desde')) {
-            $query->whereDate('created_at', '>=', $request->get('desde'));
+        if (isset($datos['desde'])) {
+            $query->whereDate('created_at', '>=', $datos['desde']);
         }
 
-        if ($request->filled('hasta')) {
-            $query->whereDate('created_at', '<=', $request->get('hasta'));
+        if (isset($datos['hasta'])) {
+            $query->whereDate('created_at', '<=', $datos['hasta']);
         }
 
         return view('auditorias.index', [
             'auditorias' => $query->paginate(20)->withQueryString(),
             'entidad' => $request->get('entidad'),
             'accion' => $request->get('accion'),
-            'desde' => $request->get('desde'),
-            'hasta' => $request->get('hasta'),
+            'desde' => $datos['desde'] ?? null,
+            'hasta' => $datos['hasta'] ?? null,
         ]);
     }
 }

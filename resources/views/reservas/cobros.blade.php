@@ -19,13 +19,13 @@
     <div class="card-body grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
             <div class="stat-label">Cliente</div>
-            <div class="font-semibold text-slate-900 mt-1">{{ $reserva->huesped->nombre ?? '—' }}</div>
-            <div class="text-xs text-slate-500">{{ $reserva->huesped->documento ?? '' }}</div>
+            <div class="font-semibold text-slate-900 mt-1">{{ $reserva->huesped?->nombre ?? '—' }}</div>
+            <div class="text-xs text-slate-500">{{ $reserva->huesped?->documento ?? '' }}</div>
         </div>
         <div>
             <div class="stat-label">Habitación</div>
-            <div class="font-semibold text-slate-900 mt-1">Nº {{ $reserva->habitacion->numero }}</div>
-            <div class="text-xs text-slate-500">{{ $reserva->habitacion->tipo ? ucfirst($reserva->habitacion->tipo) : '—' }}</div>
+            <div class="font-semibold text-slate-900 mt-1">Nº {{ $reserva->habitacion?->numero ?? 'N/D' }}</div>
+            <div class="text-xs text-slate-500">{{ $reserva->habitacion?->tipo ? ucfirst($reserva->habitacion?->tipo) : '—' }}</div>
         </div>
         <div>
             <div class="stat-label">Estadía</div>
@@ -144,13 +144,6 @@
                                         @csrf
                                         <input type="hidden" name="motivo" value="">
                                         <button class="btn btn-sm btn-secondary" type="submit">Anular</button>
-                                    </form>
-                                @endif
-                                @if (auth()->user()->esAdmin() && ! $cobro->anulado && ! $cobro->esContraasiento() && ! in_array($reserva->estado, ['finalizada']))
-                                    <form method="POST" action="{{ route('cobros.destroy', $cobro->id) }}" onsubmit="return confirm('¿Eliminar este cobro?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="btn btn-sm btn-danger" type="submit">Eliminar</button>
                                     </form>
                                 @endif
                             </div>

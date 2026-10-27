@@ -11,12 +11,24 @@ class Reserva extends Model
 {
     use SoftDeletes;
 
+    public const ESTADO_CONFIRMADA = 'confirmada';
+
+    public const ESTADO_EN_ESTADIA = 'en_estadia';
+
+    public const ESTADO_FINALIZADA = 'finalizada';
+
+    public const ESTADO_CANCELADA = 'cancelada';
+
     public const ESTADOS = [
-        'pendiente',
-        'confirmada',
-        'hospedado',
-        'finalizada',
-        'cancelada',
+        self::ESTADO_CONFIRMADA,
+        self::ESTADO_EN_ESTADIA,
+        self::ESTADO_FINALIZADA,
+        self::ESTADO_CANCELADA,
+    ];
+
+    public const ESTADOS_ACTIVOS = [
+        self::ESTADO_CONFIRMADA,
+        self::ESTADO_EN_ESTADIA,
     ];
 
     protected $fillable = [
@@ -39,17 +51,22 @@ class Reserva extends Model
 
     public function habitacion(): BelongsTo
     {
-        return $this->belongsTo(Habitacion::class);
+        return $this->belongsTo(Habitacion::class)->withTrashed();
     }
 
     public function huesped(): BelongsTo
     {
-        return $this->belongsTo(Huesped::class);
+        return $this->belongsTo(Huesped::class)->withTrashed();
     }
 
     public function cobros(): HasMany
     {
         return $this->hasMany(Cobro::class);
+    }
+
+    public function nochesOcupadas(): HasMany
+    {
+        return $this->hasMany(ReservaNoche::class);
     }
 
     public function noches(): int
@@ -63,6 +80,11 @@ class Reserva extends Model
 
     public function activa(): bool
     {
-        return ! in_array($this->estado, ['cancelada', 'finalizada']);
+        return ! in_array($this->estado, [self::ESTADO_CANCELADA, self::ESTADO_FINALIZADA]);
+    }
+
+    public function enEstadia(): bool
+    {
+        return $this->estado === self::ESTADO_EN_ESTADIA;
     }
 }

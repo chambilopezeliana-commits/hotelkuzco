@@ -143,8 +143,9 @@ class HuespedImportController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+            report($e);
 
-            return back()->with('error', 'Error durante la importación: '.$e->getMessage());
+            return back()->with('error', 'No se pudo completar la importación. Verifique el formato del archivo e intente nuevamente.');
         }
 
         $mensaje = 'Importación finalizada: '.$nuevos.' nuevos, '.$actualizados.' actualizados, '.$omitidos.' omitidos.';
